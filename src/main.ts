@@ -15,7 +15,7 @@ import { Renderer } from './render/renderer.js';
 import { Announcer, prefersReducedMotion } from './ui/a11y.js';
 import { acceptsSteering, isSimulating, reduce } from './game/phase.js';
 import { addTrauma, createCamera, updateCamera } from './render/camera.js';
-import { computeViewport } from './core/viewport.js';
+import { computeViewport, fitDisplaySize } from './core/viewport.js';
 import { createAudioEngine } from './audio/audio.js';
 import { createEventBuffer } from './game/events.js';
 import { createRng, randomSeed } from './core/rng.js';
@@ -109,10 +109,16 @@ function start(): void {
     WORLD.height,
   );
 
+  const wrap = stage.parentElement ?? stage;
+
   const resize = (): void => {
+    const fit = fitDisplaySize(wrap.clientWidth, wrap.clientHeight, WORLD.width, WORLD.height);
+    canvas.style.width = `${String(fit.width)}px`;
+    canvas.style.height = `${String(fit.height)}px`;
+
     viewport = computeViewport(
-      stage.clientWidth,
-      stage.clientHeight,
+      fit.width,
+      fit.height,
       window.devicePixelRatio,
       WORLD.width,
       WORLD.height,
@@ -122,7 +128,7 @@ function start(): void {
 
   // A ResizeObserver also fires when a mobile browser's URL bar collapses,
   // which a window resize listener misses.
-  new ResizeObserver(resize).observe(stage);
+  new ResizeObserver(resize).observe(wrap);
   window.addEventListener('orientationchange', resize);
   resize();
 

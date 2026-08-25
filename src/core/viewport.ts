@@ -7,27 +7,23 @@ import type { Vec2 } from './types.js';
 export const DPR_CAP = 2;
 
 /**
- * How the fixed-size world is mapped onto the canvas element.
+ * How the fixed-size world maps onto the canvas element.
  *
- * The world is a constant logical size, letterboxed into whatever space the
- * page gives it. Keeping that mapping in one pure function is what makes the
- * pointer land exactly on the ship — the original implementation applied a CSS
- * `translate(-50%, -50%)` *and* subtracted half the ship width in JavaScript,
- * so the ship rendered a full body-width away from the cursor.
+ * The canvas backing store is always the world's own aspect ratio, and CSS
+ * scales the element to fit whatever space the page gives it. That removes the
+ * letterbox arithmetic entirely: the renderer draws in world coordinates, and
+ * the frame the player sees is exactly the play field on any screen shape.
  */
 export interface Viewport {
-  /** Canvas size in CSS pixels. */
+  /** Displayed canvas size in CSS pixels. */
   readonly cssWidth: number;
   readonly cssHeight: number;
   /** Canvas backing-store size in device pixels. */
   readonly pixelWidth: number;
   readonly pixelHeight: number;
   readonly dpr: number;
-  /** World units → CSS pixels. */
+  /** World units per CSS pixel of the displayed element. */
   readonly scale: number;
-  /** Letterbox bars, in CSS pixels. */
-  readonly offsetX: number;
-  readonly offsetY: number;
 }
 
 export function computeViewport(
@@ -38,20 +34,33 @@ export function computeViewport(
   worldHeight: number,
 ): Viewport {
   const dpr = Math.max(1, Math.min(devicePixelRatio, DPR_CAP));
-  const scale = Math.min(cssWidth / worldWidth, cssHeight / worldHeight);
-  const renderedWidth = worldWidth * scale;
-  const renderedHeight = worldHeight * scale;
-
   return {
     cssWidth,
     cssHeight,
-    pixelWidth: Math.round(cssWidth * dpr),
-    pixelHeight: Math.round(cssHeight * dpr),
+    pixelWidth: Math.round(worldWidth * dpr),
+    pixelHeight: Math.round(worldHeight * dpr),
     dpr,
-    scale,
-    offsetX: (cssWidth - renderedWidth) / 2,
-    offsetY: (cssHeight - renderedHeight) / 2,
+    scale: cssWidth > 0 ? worldWidth / cssWidth : 1,
   };
+}
+
+/**
+ * Fits the world into the available box, preserving its aspect ratio.
+ *
+ * Done here rather than in CSS because a percentage `max-height` does not
+ * resolve against an auto-height parent, so the pure-CSS version overflowed on
+ * short windows. One tested function beats an arrangement that silently breaks
+ * on some screen shapes.
+ */
+export function fitDisplaySize(
+  availableWidth: number,
+  availableHeight: number,
+  worldWidth: number,
+  worldHeight: number,
+): { width: number; height: number } {
+  if (availableWidth <= 0 || availableHeight <= 0) return { width: 0, height: 0 };
+  const scale = Math.min(availableWidth / worldWidth, availableHeight / worldHeight);
+  return { width: worldWidth * scale, height: worldHeight * scale };
 }
 
 export interface ElementRect {
@@ -62,8 +71,12 @@ export interface ElementRect {
 }
 
 /**
- * Converts a pointer/touch position in client coordinates into world
- * coordinates, undoing both the letterbox offset and the scale.
+ * Converts a pointer or touch position into world coordinates.
+ *
+ * The original game rendered the ship a full body-width from the cursor: the
+ * stylesheet applied `translate(-50%, -50%)` while the script also subtracted
+ * half its width. Keeping the mapping in one tested function is what stops that
+ * class of bug.
  */
 export function screenToWorld(
   clientX: number,
@@ -72,11 +85,12 @@ export function screenToWorld(
   worldWidth: number,
   worldHeight: number,
 ): Vec2 {
-  const view = computeViewport(rect.width, rect.height, 1, worldWidth, worldHeight);
-  if (view.scale === 0) return { x: worldWidth / 2, y: worldHeight / 2 };
+  if (rect.width === 0 || rect.height === 0) {
+    return { x: worldWidth / 2, y: worldHeight / 2 };
+  }
   return {
-    x: (clientX - rect.left - view.offsetX) / view.scale,
-    y: (clientY - rect.top - view.offsetY) / view.scale,
+    x: ((clientX - rect.left) / rect.width) * worldWidth,
+    y: ((clientY - rect.top) / rect.height) * worldHeight,
   };
 }
 
@@ -88,9 +102,8 @@ export function worldToScreen(
   worldWidth: number,
   worldHeight: number,
 ): Vec2 {
-  const view = computeViewport(rect.width, rect.height, 1, worldWidth, worldHeight);
   return {
-    x: worldX * view.scale + view.offsetX + rect.left,
-    y: worldY * view.scale + view.offsetY + rect.top,
+    x: (worldX / worldWidth) * rect.width + rect.left,
+    y: (worldY / worldHeight) * rect.height + rect.top,
   };
 }

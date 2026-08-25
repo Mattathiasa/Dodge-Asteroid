@@ -45,16 +45,10 @@ export class Renderer {
 
     ctx.setTransform(viewport.dpr, 0, 0, viewport.dpr, 0, 0);
     ctx.fillStyle = PALETTE.background;
-    ctx.fillRect(0, 0, viewport.cssWidth, viewport.cssHeight);
+    ctx.fillRect(0, 0, WORLD.width, WORLD.height);
 
     ctx.save();
-    ctx.translate(viewport.offsetX + camera.shakeX, viewport.offsetY + camera.shakeY);
-    ctx.scale(viewport.scale, viewport.scale);
-
-    // Clip to the play field so nothing bleeds into the letterbox bars.
-    ctx.beginPath();
-    ctx.rect(0, 0, WORLD.width, WORLD.height);
-    ctx.clip();
+    ctx.translate(camera.shakeX, camera.shakeY);
 
     this.drawBackdrop(ctx);
     this.starfield.draw(ctx);

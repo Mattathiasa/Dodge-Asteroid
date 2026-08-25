@@ -33,6 +33,13 @@ Canvas 2D · zero runtime dependencies
   <img src="docs/menu.png" alt="The title screen" width="45%">
 </p>
 
+<p align="center">
+  <img src="docs/store/store-1.png" alt="Thread the gap: every near miss builds your combo" width="23%">
+  <img src="docs/store/store-2.png" alt="One tap to fly: mouse, finger or keyboard" width="23%">
+  <img src="docs/store/store-3.png" alt="Beat your best: scores are kept on your device" width="23%">
+  <img src="docs/store/store-4.png" alt="Play it your way: difficulties, reduced motion, sound off" width="23%">
+</p>
+
 ## How it is put together
 
 The guiding rule is that everything interesting is a pure function, and the
@@ -76,14 +83,17 @@ A few details that matter more than they sound:
   the start, steepest in the middle, flat once it tops out.
 - **Entities live in fixed-capacity pools**, so a long run does no per-frame
   allocation and never pauses for garbage collection mid-dodge.
-- **The canvas is sized in device pixels** and the world is letterboxed into it,
-  which keeps it sharp on high-density displays and puts the pointer exactly on
-  the ship.
+- **The canvas backing store carries the world's own aspect ratio**, sized in
+  device pixels, and its display size is fitted in JavaScript. That keeps it
+  sharp on high-density displays, puts the pointer exactly on the ship, and
+  means the frame is the play field on any screen shape — the pure-CSS version
+  left dead bands on tall phones, because a percentage `max-height` does not
+  resolve against an auto-height parent.
 
 ## Testing
 
 The simulation is a pure function of its seed, its input and its timestep, and
-that is what the tests cover: **143 unit tests** across the difficulty curve,
+that is what the tests cover: **153 unit tests** across the difficulty curve,
 collision (including the tunnelling case), scoring, spawning, the state machine,
 the loop, the object pool, persistence, and a sixty-second deterministic
 simulation of a whole run.
@@ -119,11 +129,12 @@ npm run preview   # serve the production build
 runtime dependencies and no binary assets — the ship, the asteroids, the
 particles and every sound effect are generated at runtime.
 
-To regenerate the screenshots and the GIF in this README:
+To regenerate the media in this README:
 
 ```bash
 npm run build && npm run preview -- --port 4173 --strictPort &
-node scripts/capture-media.mjs docs
+node scripts/capture-media.mjs docs        # screenshots and the demo GIF
+node scripts/capture-store.mjs docs/store  # store-style marketing cards
 ```
 
 ## About the rewrite
@@ -142,7 +153,7 @@ to avoid:
 | The ship rendered a full body-width away from the cursor                                                                                                                       | One tested coordinate mapping                                       |
 | Mouse only, with no viewport meta tag, so it could not be played on a phone                                                                                                    | Mouse, touch and keyboard                                           |
 | 86 KB of vendored jQuery carrying three CVEs                                                                                                                                   | No runtime dependencies                                             |
-| No tests, no CI, no licence                                                                                                                                                    | 143 unit tests, 12 e2e specs, CI on every push                      |
+| No tests, no CI, no licence                                                                                                                                                    | 153 unit tests, 12 e2e specs, CI on every push                      |
 
 ## Licence
 

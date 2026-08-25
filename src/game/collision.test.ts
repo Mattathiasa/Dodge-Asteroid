@@ -58,13 +58,23 @@ describe('sweptCircleToi', () => {
   });
 
   it('reports the entry time, not the exit time', () => {
-    const toi = sweptCircleToi({ x: 0, y: 0, r: 5 }, { x: 100, y: 0 }, { x: 50, y: 0, r: 5 }, still);
+    const toi = sweptCircleToi(
+      { x: 0, y: 0, r: 5 },
+      { x: 100, y: 0 },
+      { x: 50, y: 0, r: 5 },
+      still,
+    );
     // Contact begins once the gap of 40 units is closed: 40/100 = 0.4.
     expect(toi).toBeCloseTo(0.4, 6);
   });
 
   it('returns null when contact would happen after this step', () => {
-    const toi = sweptCircleToi({ x: 0, y: 0, r: 5 }, { x: 10, y: 0 }, { x: 500, y: 0, r: 5 }, still);
+    const toi = sweptCircleToi(
+      { x: 0, y: 0, r: 5 },
+      { x: 10, y: 0 },
+      { x: 500, y: 0, r: 5 },
+      still,
+    );
     expect(toi).toBeNull();
   });
 

@@ -250,8 +250,7 @@ function start(): void {
 
       if (phase === 'countdown') {
         world.countdown -= dt;
-        countdownEl.textContent =
-          world.countdown > 0 ? String(Math.ceil(world.countdown)) : 'GO';
+        countdownEl.textContent = world.countdown > 0 ? String(Math.ceil(world.countdown)) : 'GO';
         if (world.countdown <= -0.35) dispatch({ type: 'COUNTDOWN_ELAPSED' });
         return;
       }

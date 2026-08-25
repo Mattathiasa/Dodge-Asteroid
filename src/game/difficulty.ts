@@ -33,19 +33,14 @@ function ramp(range: Range, intensity: number): number {
  * steepest in the middle, and flat again once it tops out.
  */
 export function intensityAt(elapsedSeconds: number): number {
-  return smoothstep(
-    clamp01((elapsedSeconds - DIFFICULTY.graceSeconds) / DIFFICULTY.rampSeconds),
-  );
+  return smoothstep(clamp01((elapsedSeconds - DIFFICULTY.graceSeconds) / DIFFICULTY.rampSeconds));
 }
 
 export function difficultyAt(elapsedSeconds: number): DifficultyParams {
   const intensity = intensityAt(elapsedSeconds);
 
   // A very slow speed drift after the plateau, so an expert run still ends.
-  const overtime = Math.max(
-    0,
-    elapsedSeconds - DIFFICULTY.graceSeconds - DIFFICULTY.rampSeconds,
-  );
+  const overtime = Math.max(0, elapsedSeconds - DIFFICULTY.graceSeconds - DIFFICULTY.rampSeconds);
   const endless = 1 + DIFFICULTY.endlessSpeedPerSecond * overtime;
   const cap = DIFFICULTY.absoluteMaxSpeed;
 

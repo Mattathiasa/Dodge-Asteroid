@@ -46,9 +46,9 @@ test('boots to the menu with a sized canvas', async ({ page }) => {
 
 test('starts a run and accumulates score over time', async ({ page }) => {
   await startRun(page);
-  await expect.poll(async () => (await snapshot(page)).score, { timeout: 10_000 }).toBeGreaterThan(
-    0,
-  );
+  await expect
+    .poll(async () => (await snapshot(page)).score, { timeout: 10_000 })
+    .toBeGreaterThan(0);
   await expect(page.locator('#hud-score')).not.toHaveText('0');
 });
 
@@ -115,9 +115,7 @@ test('ends the run with an in-page screen, never a native alert', async ({ page 
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   }
 
-  await expect
-    .poll(async () => (await snapshot(page)).phase, { timeout: 90_000 })
-    .toBe('gameOver');
+  await expect.poll(async () => (await snapshot(page)).phase, { timeout: 90_000 }).toBe('gameOver');
 
   await expect(page.getByRole('heading', { name: 'Run over' })).toBeVisible();
   expect(nativeDialog).toBe(false);
@@ -131,9 +129,7 @@ test('persists the best score across a reload', async ({ page }) => {
   if (box !== null) {
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   }
-  await expect
-    .poll(async () => (await snapshot(page)).phase, { timeout: 90_000 })
-    .toBe('gameOver');
+  await expect.poll(async () => (await snapshot(page)).phase, { timeout: 90_000 }).toBe('gameOver');
 
   const stored = await page.evaluate(() => localStorage.getItem('dodge-asteroid:profile'));
   expect(stored).not.toBeNull();
@@ -149,9 +145,7 @@ test('restarts from the game-over screen', async ({ page }) => {
   const box = await page.locator('#game').boundingBox();
   if (box !== null) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 
-  await expect
-    .poll(async () => (await snapshot(page)).phase, { timeout: 90_000 })
-    .toBe('gameOver');
+  await expect.poll(async () => (await snapshot(page)).phase, { timeout: 90_000 }).toBe('gameOver');
 
   await page.getByRole('button', { name: 'Play again' }).click();
   await expect.poll(async () => (await snapshot(page)).phase, { timeout: 15_000 }).toBe('playing');

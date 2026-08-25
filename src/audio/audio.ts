@@ -1,11 +1,5 @@
 export type SfxName =
-  | 'uiSelect'
-  | 'start'
-  | 'nearMiss'
-  | 'pickup'
-  | 'shieldBreak'
-  | 'lifeLost'
-  | 'gameOver';
+  'uiSelect' | 'start' | 'nearMiss' | 'pickup' | 'shieldBreak' | 'lifeLost' | 'gameOver';
 
 export interface AudioEngine {
   readonly muted: boolean;
@@ -117,7 +111,10 @@ export function createAudioEngine(factory?: () => AudioContext): AudioEngine {
       const gain = context.createGain();
       oscillator.type = voice.type;
       oscillator.frequency.setValueAtTime(voice.from, now);
-      oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, voice.to), now + voice.duration);
+      oscillator.frequency.exponentialRampToValueAtTime(
+        Math.max(1, voice.to),
+        now + voice.duration,
+      );
 
       gain.gain.setValueAtTime(voice.gain, now);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + voice.duration);

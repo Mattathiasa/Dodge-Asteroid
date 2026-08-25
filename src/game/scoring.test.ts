@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { SCORING } from '../config.js';
-import { applyDodge, comboMultiplier, createScoreState, expireCombo, tickScore } from './scoring.js';
+import {
+  applyDodge,
+  comboMultiplier,
+  createScoreState,
+  expireCombo,
+  tickScore,
+} from './scoring.js';
 
 describe('comboMultiplier', () => {
   it('starts at 1 and grows by the configured step', () => {

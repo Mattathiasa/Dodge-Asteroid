@@ -24,12 +24,7 @@ export interface FrameInput {
  * of the world, the input and the world's seeded RNG — no clocks, no DOM, no
  * audio — which is what makes a whole run reproducible and testable.
  */
-export function update(
-  world: World,
-  dt: number,
-  input: FrameInput,
-  events: SimEventSink,
-): boolean {
+export function update(world: World, dt: number, input: FrameInput, events: SimEventSink): boolean {
   const { ship } = world;
 
   // Time dilation affects the world, but never the player's own responsiveness.
@@ -154,10 +149,7 @@ function advanceHazards(world: World, dt: number, events: SimEventSink): boolean
       // The shield bubble vaporises anything it touches.
       ship.shieldTime = 0;
       a.alive = false;
-      emitBurst(world.particles, world.rng, a.x, a.y, 30, [
-        PALETTE.shield,
-        PALETTE.asteroid,
-      ]);
+      emitBurst(world.particles, world.rng, a.x, a.y, 30, [PALETTE.shield, PALETTE.asteroid]);
       events.emit({ type: 'shieldBreak', x: a.x, y: a.y });
       return;
     }

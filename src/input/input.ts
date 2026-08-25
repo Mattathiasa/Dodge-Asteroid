@@ -118,7 +118,11 @@ export class InputManager {
     this.mode = isTouch ? 'touch' : 'pointer';
   };
 
-  private readonly onPointerLeave = (): void => {
+  private readonly onPointerLeave = (event: PointerEvent): void => {
+    // A mouse leaving the canvas should stop steering. A finger lifting should
+    // not: touch pointers cease to exist on release, so clearing here would
+    // mean a tap barely moved the ship and only a held drag ever worked.
+    if (event.pointerType === 'touch') return;
     this.target = null;
   };
 

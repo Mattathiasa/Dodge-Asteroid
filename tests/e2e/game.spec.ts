@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 
 interface DebugSnapshot {
@@ -10,7 +11,7 @@ interface DebugSnapshot {
   seed: number;
 }
 
-async function snapshot(page: import('@playwright/test').Page): Promise<DebugSnapshot> {
+async function snapshot(page: Page): Promise<DebugSnapshot> {
   return page.evaluate(() => {
     const api = window.__dodge;
     if (api === undefined) throw new Error('game not booted');
@@ -19,7 +20,7 @@ async function snapshot(page: import('@playwright/test').Page): Promise<DebugSna
 }
 
 /** Waits until the game leaves the countdown and is actually simulating. */
-async function startRun(page: import('@playwright/test').Page): Promise<void> {
+async function startRun(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Play' }).click();
   await expect.poll(async () => (await snapshot(page)).phase, { timeout: 15_000 }).toBe('playing');
 }
@@ -176,4 +177,50 @@ test('settings persist the sound preference', async ({ page }) => {
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.__dodge !== undefined)).toBe(true);
   await expect(page.locator('#mute-state')).toHaveText('off');
+});
+
+test.describe('touch', () => {
+  test.skip(({ hasTouch }) => !hasTouch, 'touch-only behaviour');
+
+  test('steers by touch', async ({ page }) => {
+    await startRun(page);
+    const box = await page.locator('#game').boundingBox();
+    expect(box).not.toBeNull();
+    if (box === null) return;
+
+    const y = box.y + box.height * 0.7;
+    await page.touchscreen.tap(box.x + box.width * 0.3, y);
+    await page.waitForTimeout(700);
+    const left = (await snapshot(page)).ship;
+
+    await page.touchscreen.tap(box.x + box.width * 0.75, y);
+    await page.waitForTimeout(700);
+    const right = (await snapshot(page)).ship;
+
+    expect(right.x).toBeGreaterThan(left.x + 20);
+  });
+
+  test('keeps the ship clear of the fingertip', async ({ page }) => {
+    await startRun(page);
+    const box = await page.locator('#game').boundingBox();
+    expect(box).not.toBeNull();
+    if (box === null) return;
+
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height * 0.65;
+
+    // Same screen point, two input types. Comparing them sidesteps any
+    // letterbox arithmetic in the test itself.
+    await page.mouse.move(x, y);
+    await page.waitForTimeout(800);
+    const byMouse = (await snapshot(page)).ship;
+
+    await page.touchscreen.tap(x, y);
+    await page.waitForTimeout(800);
+    const byTouch = (await snapshot(page)).ship;
+
+    // Touch steers a point above the finger, so a fingertip does not cover the
+    // ship the player is trying to fly.
+    expect(byTouch.y).toBeLessThan(byMouse.y - 15);
+  });
 });

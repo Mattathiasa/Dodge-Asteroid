@@ -1,19 +1,45 @@
-/* Palette mirrors src/config.ts PALETTE, so canvas and DOM stay in step. */
+/* ==========================================================================
+   Dodge Asteroid — "sticker arcade"
+
+   The meteors are drawn as glossy rocks with thick dark outlines, so the UI
+   chrome speaks the same language: ink outlines, warm cream panels, and hard
+   offset shadows that give controls real thickness. Cream on deep purple,
+   rather than yet more neon on black.
+
+   Canvas colours live in src/config.ts (PALETTE); these tokens mirror them so
+   the DOM and the play field stay in step.
+   ========================================================================== */
+
 :root {
-  --bg: #080a1f;
-  --bg-raised: #10143a;
-  --bg-glow: #1a1040;
-  --ink: #e8ecff;
-  --ink-dim: #9aa3d8;
+  --ink: #1b0b36;
+  --ink-soft: #6b4a86;
+
+  --cream: #fff3dc;
+  --cream-2: #f6e6c8;
+  --cream-edge: #d9c6a4;
+
+  --space-1: #241350;
+  --space-2: #150a35;
+  --space-3: #0a0620;
+  --space-text: #b6a7d6;
+
+  --ember: #f2792a;
+  --ember-light: #ffc46b;
+  --ember-dark: #a8330d;
+  --ember-shade: #8f2f0b;
+
   --cyan: #4ff0ff;
-  --cyan-bright: #0affff;
-  --magenta: #ff4fa3;
-  --green: #7dffc4;
+  --cyan-light: #9dfbff;
+  --cyan-shade: #10708a;
+
   --amber: #ffd35c;
-  --edge: rgba(120, 132, 220, 0.28);
-  --radius: 14px;
-  --font: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
-  --font-display: 'Fredoka', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --green: #7dffc4;
+  --rose: #ff5fb4;
+  --rose-dark: #b81a76;
+
+  --radius: 20px;
+  --font: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-display: 'Bungee', 'Outfit', 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
 }
 
@@ -28,11 +54,10 @@ body {
 }
 
 body {
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--space-3);
+  color: var(--cream);
   font-family: var(--font);
   overflow: hidden;
-  /* Keeps the layout clear of notches and home indicators. */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
 }
@@ -72,43 +97,61 @@ body {
 
 .topbar__title {
   margin: 0;
-  font-size: clamp(1.1rem, 3.4vw, 1.6rem);
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--cyan);
-  text-shadow: 0 0 18px rgba(79, 240, 255, 0.45);
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 3.2vw, 1.35rem);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--cream);
+  -webkit-text-stroke: 3px var(--ink);
+  paint-order: stroke fill;
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+
+/* The title screen carries the branding, so the bar steps aside for it. */
+body[data-screen='menu'] .topbar__title {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .icon-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 7px;
+  min-height: 40px;
+  padding: 7px 15px;
   font: inherit;
-  font-size: 0.8rem;
-  color: var(--ink-dim);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--edge);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--cream);
+  border: 3px solid var(--ink);
   border-radius: 999px;
+  box-shadow: 0 4px 0 var(--ink);
   cursor: pointer;
+  transition: transform 90ms ease;
 }
 
 .icon-button:hover {
-  color: var(--ink);
-  border-color: var(--cyan);
+  background: var(--cream-2);
+}
+
+.icon-button:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--ink);
 }
 
 .icon-button__state {
-  color: var(--cyan);
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  color: var(--ember-dark);
 }
 
 /* ---------- stage ---------- */
 
 /* The stage is held at the world's aspect ratio and centred, so the frame the
-   player sees is the play field itself rather than a wide box with the field
-   letterboxed somewhere inside it. The canvas still letterboxes internally,
+   player sees is the play field itself. The canvas still letterboxes inside,
    which keeps very short or very narrow windows correct. */
 .stage-wrap {
   flex: 1 1 auto;
@@ -124,10 +167,10 @@ body {
   max-width: 100%;
   border-radius: var(--radius);
   overflow: hidden;
-  border: 1px solid var(--edge);
+  border: 4px solid var(--ink);
   box-shadow:
-    0 0 0 1px rgba(8, 10, 31, 0.9),
-    0 22px 60px rgba(0, 0, 0, 0.55);
+    0 8px 0 var(--ink),
+    0 22px 50px rgba(0, 0, 0, 0.55);
 }
 
 .stage__canvas {
@@ -146,16 +189,22 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 12px 14px;
   pointer-events: none;
-  font-family: var(--font-mono);
+  transition: opacity 200ms ease;
+}
+
+body[data-screen='menu'] .hud,
+body[data-screen='settings'] .hud,
+body[data-screen='about'] .hud {
+  opacity: 0;
 }
 
 .hud__group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
 }
 
 .hud__group--center {
@@ -168,43 +217,99 @@ body {
   align-items: flex-end;
 }
 
+/* Score sits on a cream chip so it stays readable over a bright meteor. */
+.hud__group:first-child {
+  align-items: flex-start;
+}
+
 .hud__label {
-  font-size: 0.62rem;
-  letter-spacing: 0.18em;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--ink-soft);
 }
 
 .hud__value {
-  font-size: 1.35rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__group:first-child .hud__label,
+.hud__group:first-child .hud__value {
+  display: inline-block;
+}
+
+.hud__group:first-child {
+  padding: 7px 15px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 4px 0 var(--ink);
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hud__group--right {
+  padding: 6px 13px;
+  background: rgba(27, 11, 54, 0.62);
+  border: 2px solid rgba(255, 243, 220, 0.32);
+  border-radius: 999px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.hud__group--right .hud__label {
+  color: var(--space-text);
+}
+
+.hud__group--right .hud__value {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--cream);
 }
 
 .hud__lives {
-  margin-top: 4px;
-  font-size: 0.85rem;
-  letter-spacing: 0.16em;
-  color: var(--magenta);
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  color: var(--rose);
+  text-shadow: 0 1px 0 var(--ink);
 }
 
 .hud__combo,
 .hud__status {
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   opacity: 0;
   transition: opacity 160ms ease;
 }
 
 .hud__combo {
-  color: var(--amber);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  padding: 5px 13px;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--amber), #f2a72a);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--ember-dark);
+  transform: rotate(-3deg);
 }
 
 .hud__status {
+  margin-top: 6px;
+  padding: 4px 12px;
   color: var(--green);
+  background: rgba(27, 11, 54, 0.72);
+  border: 2px solid var(--green);
+  border-radius: 999px;
 }
 
 .hud__combo.is-active,
@@ -219,11 +324,11 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
-  font-family: var(--font-mono);
-  font-size: clamp(3rem, 14vw, 6rem);
-  font-weight: 700;
-  color: var(--cyan);
-  text-shadow: 0 0 34px rgba(79, 240, 255, 0.55);
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 15vw, 6.5rem);
+  color: var(--cream);
+  -webkit-text-stroke: 10px var(--ink);
+  paint-order: stroke fill;
   pointer-events: none;
   opacity: 0;
 }
@@ -239,46 +344,62 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: 18px;
   pointer-events: none;
 }
 
 .stage.has-overlay .overlays {
   pointer-events: auto;
-  background: radial-gradient(circle at 50% 40%, rgba(26, 16, 64, 0.82), rgba(8, 10, 31, 0.94));
-  backdrop-filter: blur(3px);
+  background: rgba(10, 6, 32, 0.68);
+}
+
+/* The title screen shows the game behind it, so its scrim is much lighter. */
+body[data-screen='menu'] .stage.has-overlay .overlays {
+  background: linear-gradient(180deg, rgba(10, 6, 32, 0.34), rgba(10, 6, 32, 0.56));
 }
 
 .screen {
-  width: min(440px, 100%);
+  width: min(420px, 100%);
   max-height: 100%;
   overflow-y: auto;
-  padding: 24px;
+  padding: 24px 20px 22px;
   text-align: center;
-  background: rgba(16, 20, 58, 0.9);
-  border: 1px solid var(--edge);
-  border-radius: var(--radius);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  background: var(--cream);
+  border: 4px solid var(--ink);
+  border-radius: 26px;
+  box-shadow:
+    0 9px 0 var(--ink),
+    0 22px 44px rgba(0, 0, 0, 0.5);
 }
 
 .screen[hidden] {
   display: none;
 }
 
-.screen__title {
-  margin: 0 0 8px;
-  font-size: clamp(1.4rem, 5vw, 2rem);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--cyan);
+.screen--home {
+  background: linear-gradient(180deg, rgba(36, 19, 80, 0.9), rgba(10, 6, 32, 0.93));
+  border-color: var(--ink);
 }
 
-.screen__lede,
-.screen__meta {
+.screen__title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 6vw, 2rem);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.screen__lede {
   margin: 0 0 18px;
-  color: var(--ink-dim);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   line-height: 1.5;
+  color: var(--space-text);
+}
+
+.screen:not(.screen--home) .screen__lede,
+.screen:not(.screen--home) .screen__meta {
+  color: var(--ink-soft);
 }
 
 .screen__result {
@@ -289,19 +410,30 @@ body {
 }
 
 .screen__score {
-  font-family: var(--font-mono);
-  font-size: clamp(2.2rem, 9vw, 3.2rem);
-  font-weight: 700;
-  line-height: 1;
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 11vw, 3.4rem);
+  line-height: 1.06;
   color: var(--ink);
 }
 
+.screen__meta {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
 .screen__best {
-  margin: 0 0 14px;
-  font-size: 0.8rem;
-  letter-spacing: 0.16em;
+  display: inline-block;
+  margin: 10px 0 0;
+  padding: 6px 15px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--amber), #f2a72a);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--ember-dark);
 }
 
 .screen__actions {
@@ -312,82 +444,203 @@ body {
   margin-top: 18px;
 }
 
-/* ---------- buttons and fields ---------- */
+/* ---------- logo ---------- */
 
-.button {
-  padding: 10px 20px;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--edge);
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    background-color 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease;
+.logo {
+  margin: 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 0.94;
+  text-transform: uppercase;
 }
 
+.logo__line {
+  transform: rotate(-2.5deg);
+}
+
+/* A real stroke painted behind the fill, rather than stacked shadows: those
+   ghost into a doubled word at any offset big enough to read as an outline. */
+.logo__line--top {
+  font-size: clamp(2.4rem, 12vw, 3.4rem);
+  color: var(--cream);
+  -webkit-text-stroke: 9px var(--ink);
+  paint-order: stroke fill;
+  text-shadow:
+    0 5px 0 var(--rose),
+    0 14px 26px rgba(0, 0, 0, 0.6);
+}
+
+.logo__line--bottom {
+  font-size: clamp(1.3rem, 6.6vw, 1.9rem);
+  letter-spacing: 0.13em;
+  color: var(--ember-light);
+  -webkit-text-stroke: 7px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- buttons ---------- */
+
+/* The offset lower layer is the button's thickness; pressing sinks into it. */
+.cta {
+  position: relative;
+  display: inline-block;
+  min-width: 200px;
+  margin: 4px 0 2px;
+  padding: 0;
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  background: linear-gradient(180deg, var(--ember-light) 0%, var(--ember) 55%, #dd5f14 100%);
+  box-shadow:
+    0 8px 0 var(--ember-shade),
+    0 16px 26px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition:
+    transform 90ms ease,
+    box-shadow 90ms ease;
+}
+
+.cta__label {
+  display: block;
+  padding: 15px 28px;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cream);
+  text-shadow: 0 3px 0 var(--ember-dark);
+}
+
+.cta:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 9px 0 var(--ember-shade),
+    0 18px 30px rgba(0, 0, 0, 0.5);
+}
+
+.cta:active {
+  transform: translateY(7px);
+  box-shadow:
+    0 1px 0 var(--ember-shade),
+    0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.cta--compact {
+  min-width: 170px;
+}
+
+.cta--compact .cta__label {
+  padding: 13px 22px;
+  font-size: 1.1rem;
+}
+
+.home-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pill,
+.button {
+  min-height: 46px;
+  padding: 12px 20px;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 0 5px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 90ms ease;
+}
+
+.pill:hover,
 .button:hover {
-  border-color: var(--cyan);
-  background: rgba(79, 240, 255, 0.1);
+  background: var(--cream-2);
+}
+
+.pill:active,
+.button:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ink);
 }
 
 .button--primary {
-  color: var(--bg);
-  background: var(--cyan);
-  border-color: var(--cyan);
-  font-weight: 600;
+  color: #06304a;
+  background: linear-gradient(180deg, var(--cyan-light) 0%, var(--cyan) 55%, #22c3e0 100%);
+  box-shadow: 0 6px 0 var(--cyan-shade);
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .button--primary:hover {
-  background: var(--cyan-bright);
+  background: linear-gradient(180deg, #b6fdff 0%, var(--cyan) 55%, #29cfe8 100%);
+}
+
+.button--primary:active {
+  box-shadow: 0 1px 0 var(--cyan-shade);
 }
 
 :focus-visible {
-  outline: 2px solid var(--cyan);
+  outline: 3px solid var(--amber);
   outline-offset: 3px;
 }
+
+/* ---------- settings ---------- */
 
 .settings {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   text-align: left;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 0.88rem;
+  gap: 7px;
+  padding: 13px 15px;
+  font-size: 0.9rem;
+  background: var(--cream-2);
+  border: 3px solid var(--ink);
+  border-radius: 16px;
 }
 
 .field--switch {
   flex-direction: row;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
 }
 
 .field__label {
-  color: var(--ink-dim);
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .field__control {
-  padding: 8px 10px;
+  min-height: 42px;
+  padding: 9px 11px;
   font: inherit;
+  font-weight: 600;
   color: var(--ink);
-  background: rgba(8, 10, 31, 0.8);
-  border: 1px solid var(--edge);
-  border-radius: 8px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
 }
 
 input[type='checkbox'] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--cyan);
+  width: 22px;
+  height: 22px;
+  accent-color: var(--ember);
 }
 
 /* ---------- stats and leaderboard ---------- */
@@ -395,9 +648,15 @@ input[type='checkbox'] {
 .stats {
   display: flex;
   justify-content: center;
-  gap: 22px;
+  gap: 20px;
   margin: 18px 0 0;
-  font-family: var(--font-mono);
+  padding: 13px 0;
+  border-top: 2px dashed rgba(255, 243, 220, 0.25);
+  border-bottom: 2px dashed rgba(255, 243, 220, 0.25);
+}
+
+.screen:not(.screen--home) .stats {
+  border-color: var(--cream-edge);
 }
 
 .stats div {
@@ -407,15 +666,25 @@ input[type='checkbox'] {
 }
 
 .stats dt {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
+  font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--space-text);
 }
 
 .stats dd {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 1.05rem;
+  color: var(--cream);
+}
+
+.screen:not(.screen--home) .stats dt {
+  color: var(--ink-soft);
+}
+
+.screen:not(.screen--home) .stats dd {
   color: var(--ink);
 }
 
@@ -426,7 +695,11 @@ input[type='checkbox'] {
 .leaderboard__empty {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--ink-dim);
+  color: var(--space-text);
+}
+
+.screen:not(.screen--home) .leaderboard__empty {
+  color: var(--ink-soft);
 }
 
 .leaderboard__list {
@@ -436,35 +709,66 @@ input[type='checkbox'] {
   counter-reset: rank;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
+  gap: 5px;
 }
 
 .leaderboard__item {
   counter-increment: rank;
   display: grid;
-  grid-template-columns: 1.6rem 1fr auto;
+  grid-template-columns: 1.5rem 1fr auto;
   align-items: baseline;
   gap: 10px;
-  padding: 5px 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 7px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  background: var(--cream-2);
+  border: 2px solid var(--cream-edge);
+  border-radius: 12px;
+}
+
+.leaderboard__item:first-child {
+  background: linear-gradient(90deg, #ffe6a8, #ffd889);
+  border-color: var(--ink);
+}
+
+.screen--home .leaderboard__item {
+  background: rgba(255, 243, 220, 0.09);
+  border-color: rgba(255, 243, 220, 0.22);
+}
+
+.screen--home .leaderboard__item:first-child {
+  background: rgba(255, 211, 92, 0.18);
+  border-color: rgba(255, 211, 92, 0.55);
 }
 
 .leaderboard__item::before {
   content: counter(rank);
-  color: var(--ink-dim);
-  font-size: 0.72rem;
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+
+.screen--home .leaderboard__item::before {
+  color: var(--space-text);
 }
 
 .leaderboard__score {
   text-align: left;
+  font-weight: 700;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .leaderboard__time {
-  color: var(--ink-dim);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.screen--home .leaderboard__score {
+  color: var(--cream);
+}
+
+.screen--home .leaderboard__time {
+  color: var(--space-text);
 }
 
 /* ---------- prose ---------- */
@@ -473,7 +777,7 @@ input[type='checkbox'] {
   text-align: left;
   font-size: 0.88rem;
   line-height: 1.6;
-  color: var(--ink-dim);
+  color: var(--ink-soft);
 }
 
 .prose strong {
@@ -481,19 +785,25 @@ input[type='checkbox'] {
 }
 
 .prose a {
-  color: var(--cyan);
+  color: var(--ember-dark);
+  font-weight: 700;
+}
+
+.prose a:hover {
+  color: var(--ember);
 }
 
 kbd {
   display: inline-block;
-  padding: 1px 6px;
+  padding: 2px 7px;
   margin: 0 1px;
-  font-family: var(--font-mono);
-  font-size: 0.78em;
+  font-family: var(--font-display);
+  font-size: 0.7em;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--edge);
-  border-radius: 5px;
+  background: var(--cream);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: 0 2px 0 var(--ink);
 }
 
 /* ---------- footer ---------- */
@@ -506,7 +816,7 @@ kbd {
 .footer__hint {
   margin: 0;
   font-size: 0.72rem;
-  color: var(--ink-dim);
+  color: var(--space-text);
 }
 
 @media (max-width: 560px) {
@@ -515,12 +825,10 @@ kbd {
   }
 
   .screen {
-    padding: 18px;
+    padding: 18px 16px 16px;
   }
 }
 
-/* Honour the OS setting: no transitions, and the renderer drops shake,
-   trails and glow when this is active. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -529,211 +837,4 @@ kbd {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-/* ==========================================================================
-   Title screen
-   ========================================================================== */
-
-.screen--home {
-  /* The attract-mode meteor field shows through, so the panel is quieter than
-     the others and lets the game itself be the backdrop. */
-  background: linear-gradient(180deg, rgba(16, 20, 58, 0.82), rgba(8, 10, 31, 0.9));
-  border-color: rgba(120, 132, 220, 0.35);
-}
-
-.logo {
-  margin: 0 0 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 0.92;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.logo__line {
-  position: relative;
-  background: linear-gradient(180deg, #ffffff 8%, var(--cyan) 52%, #1d8fc4 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.logo__line--top {
-  font-size: clamp(2.1rem, 10vw, 3.1rem);
-}
-
-.logo__line--bottom {
-  font-size: clamp(1.45rem, 6.8vw, 2.15rem);
-  letter-spacing: 0.16em;
-}
-
-/* A dark stroke behind the gradient fill, which is what makes an arcade logo
-   read against a busy background. */
-.logo__line::before {
-  content: attr(data-text);
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  color: transparent;
-  -webkit-text-stroke: 7px #05010f;
-  text-shadow:
-    0 3px 0 #05010f,
-    0 0 26px rgba(79, 240, 255, 0.5);
-}
-
-/* ==========================================================================
-   Chunky call-to-action button
-   ========================================================================== */
-
-.cta {
-  position: relative;
-  display: inline-block;
-  min-width: 190px;
-  margin: 4px 0 2px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #0d3d52, #06202c);
-  cursor: pointer;
-  /* The offset lower layer is the button's "thickness". */
-  box-shadow:
-    0 6px 0 #06202c,
-    0 12px 22px rgba(0, 0, 0, 0.45);
-  transition:
-    transform 90ms ease,
-    box-shadow 90ms ease;
-}
-
-.cta__label {
-  display: block;
-  padding: 13px 30px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #8dfaff 0%, var(--cyan) 42%, #17a8d6 100%);
-  color: #04222e;
-  font-family: var(--font-display);
-  font-size: 1.16rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75);
-}
-
-.cta:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 7px 0 #06202c,
-    0 14px 26px rgba(0, 0, 0, 0.5);
-}
-
-.cta:active {
-  transform: translateY(5px);
-  box-shadow:
-    0 1px 0 #06202c,
-    0 4px 10px rgba(0, 0, 0, 0.4);
-}
-
-.cta--compact {
-  min-width: 160px;
-}
-
-.cta--compact .cta__label {
-  padding: 11px 24px;
-  font-size: 1rem;
-}
-
-.home-actions {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.pill {
-  padding: 8px 18px;
-  font: inherit;
-  font-family: var(--font-display);
-  font-size: 0.84rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--edge);
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    background-color 140ms ease,
-    border-color 140ms ease,
-    transform 90ms ease;
-}
-
-.pill:hover {
-  border-color: var(--cyan);
-  background: rgba(79, 240, 255, 0.12);
-}
-
-.pill:active {
-  transform: translateY(2px);
-}
-
-/* Headings and buttons pick up the display face throughout. */
-.screen__title,
-.topbar__title,
-.button,
-.screen__score {
-  font-family: var(--font-display);
-}
-
-.button {
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.button:active {
-  transform: translateY(2px);
-}
-
-/* The menu owns the branding, so the top bar title steps aside for it. */
-body[data-screen='menu'] .topbar__title {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
-.topbar__title {
-  transition:
-    opacity 200ms ease,
-    transform 200ms ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cta,
-  .pill,
-  .button,
-  .topbar__title {
-    transition: none;
-  }
-}
-
-/* The title screen is meant to show the game behind it, so its scrim is much
-   lighter than the pause and game-over ones. The panel itself stays opaque
-   enough to keep the text readable over moving meteors. */
-body[data-screen='menu'] .stage.has-overlay .overlays {
-  background: linear-gradient(180deg, rgba(8, 10, 31, 0.35), rgba(8, 10, 31, 0.55));
-  backdrop-filter: blur(1px);
-}
-
-/* A title screen should not show a live HUD. It stays visible while paused and
-   on game over, where the numbers are still the player's own run. */
-body[data-screen='menu'] .hud,
-body[data-screen='settings'] .hud,
-body[data-screen='about'] .hud {
-  opacity: 0;
-}
-
-.hud {
-  transition: opacity 200ms ease;
 }

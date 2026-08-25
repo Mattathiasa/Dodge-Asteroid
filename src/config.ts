@@ -146,11 +146,11 @@ export const SPAWN = {
 
 /** Named colours, so the palette can be changed in one edit. */
 export const PALETTE = {
-  background: '#080a1f',
-  backgroundGlow: '#1a1040',
-  starFar: '#3b3f7a',
-  starMid: '#6f77c4',
-  starNear: '#b9c0ff',
+  background: '#0a0620',
+  backgroundGlow: '#241350',
+  starFar: '#463a86',
+  starMid: '#7d74c8',
+  starNear: '#cfd2ff',
   ship: '#4ff0ff',
   shipGlow: '#0affff',
   shipTrail: '#2ad4ff',

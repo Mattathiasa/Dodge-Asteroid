@@ -1,0 +1,179 @@
+import { expect, test } from '@playwright/test';
+
+interface DebugSnapshot {
+  phase: string;
+  score: number;
+  elapsed: number;
+  lives: number;
+  ship: { x: number; y: number };
+  asteroids: number;
+  seed: number;
+}
+
+async function snapshot(page: import('@playwright/test').Page): Promise<DebugSnapshot> {
+  return page.evaluate(() => {
+    const api = window.__dodge;
+    if (api === undefined) throw new Error('game not booted');
+    return api.snapshot();
+  });
+}
+
+/** Waits until the game leaves the countdown and is actually simulating. */
+async function startRun(page: import('@playwright/test').Page): Promise<void> {
+  await page.getByRole('button', { name: 'Play' }).click();
+  await expect.poll(async () => (await snapshot(page)).phase, { timeout: 15_000 }).toBe('playing');
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.goto('/');
+  await expect.poll(() => page.evaluate(() => window.__dodge !== undefined)).toBe(true);
+});
+
+test('boots to the menu with a sized canvas', async ({ page }) => {
+  await expect(page.getByRole('heading', { name: 'Dodge Asteroid', level: 2 })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+
+  const size = await page.locator('#game').evaluate((el: HTMLCanvasElement) => ({
+    width: el.width,
+    height: el.height,
+  }));
+  expect(size.width).toBeGreaterThan(0);
+  expect(size.height).toBeGreaterThan(0);
+
+  expect((await snapshot(page)).phase).toBe('menu');
+});
+
+test('starts a run and accumulates score over time', async ({ page }) => {
+  await startRun(page);
+  await expect.poll(async () => (await snapshot(page)).score, { timeout: 10_000 }).toBeGreaterThan(
+    0,
+  );
+  await expect(page.locator('#hud-score')).not.toHaveText('0');
+});
+
+test('the ship follows the pointer', async ({ page }) => {
+  await startRun(page);
+  const box = await page.locator('#game').boundingBox();
+  expect(box).not.toBeNull();
+  if (box === null) return;
+
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.4);
+  await page.waitForTimeout(600);
+  const left = (await snapshot(page)).ship;
+
+  await page.mouse.move(box.x + box.width * 0.75, box.y + box.height * 0.4);
+  await page.waitForTimeout(600);
+  const right = (await snapshot(page)).ship;
+
+  expect(right.x).toBeGreaterThan(left.x + 20);
+});
+
+test('the ship responds to the keyboard', async ({ page }) => {
+  await startRun(page);
+  const before = (await snapshot(page)).ship;
+
+  await page.keyboard.down('ArrowLeft');
+  await page.waitForTimeout(600);
+  await page.keyboard.up('ArrowLeft');
+
+  expect((await snapshot(page)).ship.x).toBeLessThan(before.x - 10);
+});
+
+test('pause actually freezes the world, and resume continues it', async ({ page }) => {
+  await startRun(page);
+  await page.waitForTimeout(500);
+
+  await page.keyboard.press('KeyP');
+  await expect(page.getByRole('heading', { name: 'Paused' })).toBeVisible();
+
+  const frozen = await snapshot(page);
+  await page.waitForTimeout(900);
+  const stillFrozen = await snapshot(page);
+
+  // This is the behaviour that never worked in the original: `animateAsteroids`
+  // was undefined, so resuming threw and asteroids stayed stuck mid-air.
+  expect(stillFrozen.elapsed).toBeCloseTo(frozen.elapsed, 3);
+  expect(stillFrozen.score).toBe(frozen.score);
+
+  await page.getByRole('button', { name: 'Resume' }).click();
+  await expect.poll(async () => (await snapshot(page)).elapsed).toBeGreaterThan(frozen.elapsed);
+});
+
+test('ends the run with an in-page screen, never a native alert', async ({ page }) => {
+  let nativeDialog = false;
+  page.on('dialog', (dialog) => {
+    nativeDialog = true;
+    void dialog.dismiss();
+  });
+
+  await startRun(page);
+
+  // Sit still in the middle of the field until something hits.
+  const box = await page.locator('#game').boundingBox();
+  if (box !== null) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  }
+
+  await expect
+    .poll(async () => (await snapshot(page)).phase, { timeout: 90_000 })
+    .toBe('gameOver');
+
+  await expect(page.getByRole('heading', { name: 'Run over' })).toBeVisible();
+  expect(nativeDialog).toBe(false);
+});
+
+test('persists the best score across a reload', async ({ page }) => {
+  await startRun(page);
+  await page.waitForTimeout(2500);
+
+  const box = await page.locator('#game').boundingBox();
+  if (box !== null) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  }
+  await expect
+    .poll(async () => (await snapshot(page)).phase, { timeout: 90_000 })
+    .toBe('gameOver');
+
+  const stored = await page.evaluate(() => localStorage.getItem('dodge-asteroid:profile'));
+  expect(stored).not.toBeNull();
+
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.__dodge !== undefined)).toBe(true);
+  const best = await page.locator('#hud-best').textContent();
+  expect(Number(best?.replace(/\D/g, '') ?? '0')).toBeGreaterThan(0);
+});
+
+test('restarts from the game-over screen', async ({ page }) => {
+  await startRun(page);
+  const box = await page.locator('#game').boundingBox();
+  if (box !== null) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+  await expect
+    .poll(async () => (await snapshot(page)).phase, { timeout: 90_000 })
+    .toBe('gameOver');
+
+  await page.getByRole('button', { name: 'Play again' }).click();
+  await expect.poll(async () => (await snapshot(page)).phase, { timeout: 15_000 }).toBe('playing');
+  expect((await snapshot(page)).score).toBeLessThan(50);
+});
+
+test('the about screen replaces the original broken link', async ({ page }) => {
+  await page.getByRole('button', { name: 'About' }).click();
+  await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Mattathias Abraham' })).toHaveAttribute(
+    'href',
+    'https://github.com/Mattathiasa',
+  );
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+});
+
+test('settings persist the sound preference', async ({ page }) => {
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByLabel('Sound effects').uncheck();
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.__dodge !== undefined)).toBe(true);
+  await expect(page.locator('#mute-state')).toHaveText('off');
+});

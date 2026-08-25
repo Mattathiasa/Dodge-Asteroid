@@ -36,6 +36,16 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
   {
+    // CommonJS deck generators: require() is the correct form here.
+    files: ['scripts/**/*.cjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: { ...globals.node },
+      sourceType: 'commonjs',
+    },
+    rules: { 'no-console': 'off', '@typescript-eslint/no-require-imports': 'off' },
+  },
+  {
     files: ['**/*.test.ts', 'tests/**/*.ts'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },

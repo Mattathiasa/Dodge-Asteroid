@@ -23,7 +23,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "media": "node scripts/capture-media.mjs docs && node scripts/capture-store.mjs docs/store",
+    "decks": "node scripts/deck-case-study.cjs && node scripts/deck-design-directions.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -35,6 +37,7 @@
     "gifenc": "^1.0.3",
     "globals": "^16.0.0",
     "jsdom": "^30.0.1",
+    "pptxgenjs": "^4.0.1",
     "prettier": "^3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.68.0",

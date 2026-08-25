@@ -133,9 +133,19 @@ To regenerate the media in this README:
 
 ```bash
 npm run build && npm run preview -- --port 4173 --strictPort &
-node scripts/capture-media.mjs docs        # screenshots and the demo GIF
-node scripts/capture-store.mjs docs/store  # store-style marketing cards
+npm run media    # screenshots, the demo GIF, and the store cards
+npm run decks    # the two slide decks in docs/decks/
 ```
+
+## Decks
+
+Two slide decks live in [`docs/decks/`](docs/decks), both generated from
+[`scripts/`](scripts) so they stay in step with the code and the screenshots:
+
+- **Case study** — the broken original, the rewrite decisions, the architecture
+  and the measured results.
+- **Design directions** — the three interface directions that were drafted, with
+  the rationale and the tradeoff for each, and what shipped.
 
 ## About the rewrite
 

@@ -128,10 +128,10 @@ node scripts/capture-media.mjs docs
 
 ## About the rewrite
 
-This started as a jQuery prototype, kept at the tag
-[`v1-original`](https://github.com/Mattathiasa/Dodge-Asteroid/tree/v1-original).
-It did not really work, and the reasons are a decent tour of what this version
-is built to avoid:
+This started as a jQuery prototype, still in the history at
+[`9390921`](https://github.com/Mattathiasa/Dodge-Asteroid/tree/9390921a5b79bbc6808cc6c210c71e2bd012eb55). It did
+not really work, and the reasons are a decent tour of what this version is built
+to avoid:
 
 | The original                                                                                                                                                                   | Now                                                                 |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |

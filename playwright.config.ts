@@ -32,9 +32,18 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    command: 'npm run build && npm run preview -- --port 4173 --strictPort',
+    // Bind IPv4 explicitly. `vite preview` defaults to `localhost`, which
+    // resolves to ::1 on the CI runner while Playwright polls 127.0.0.1, so the
+    // server came up and was never seen — the whole run timed out before a
+    // single test started. It passed locally only because localhost resolves to
+    // IPv4 there.
+    command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env['CI'],
     timeout: 180_000,
+    // Surface server output, so a failure like the above is diagnosable from
+    // the CI log instead of a bare timeout.
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 });

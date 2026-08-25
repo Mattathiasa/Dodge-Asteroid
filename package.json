@@ -1,0 +1,46 @@
+{
+  "name": "dodge-asteroid",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A neon arcade dodging game built with TypeScript and Canvas 2D.",
+  "author": "Mattathias Abraham (https://github.com/Mattathiasa)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mattathiasa/Dodge-Asteroid"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^22.10.2",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.0.0",
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.68.0",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

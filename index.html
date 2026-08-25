@@ -20,6 +20,13 @@
     <meta property="og:url" content="https://mattathiasa.github.io/Dodge-Asteroid/" />
     <meta name="twitter:card" content="summary_large_image" />
 
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23080a1f'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%234ff0ff'/%3E%3Ccircle cx='10' cy='8' r='3.4' fill='%23ff4fa3'/%3E%3Ccircle cx='23' cy='11' r='2.6' fill='%23ff4fa3'/%3E%3C/svg%3E"
@@ -58,24 +65,26 @@
           <!-- Screens are DOM overlays, not canvas-drawn, so their controls are
              focusable, keyboard-operable and readable by screen readers. -->
           <div class="overlays" id="overlays">
-            <section class="screen" id="screen-menu" aria-labelledby="menu-heading">
-              <h2 class="screen__title" id="menu-heading">Dodge Asteroid</h2>
+            <section class="screen screen--home" id="screen-menu" aria-labelledby="menu-heading">
+              <h2 class="logo" id="menu-heading">
+                <span class="logo__line logo__line--top" data-text="DODGE">DODGE</span>
+                <span class="logo__line logo__line--bottom" data-text="ASTEROID">ASTEROID</span>
+              </h2>
+
               <p class="screen__lede">
                 Survive the field. Move with the mouse, your finger, or
                 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>.
               </p>
-              <div class="screen__actions">
-                <button
-                  class="button button--primary"
-                  id="play-button"
-                  type="button"
-                  data-autofocus
-                >
-                  Play
-                </button>
-                <button class="button" id="settings-button" type="button">Settings</button>
-                <button class="button" id="about-button" type="button">About</button>
+
+              <button class="cta" id="play-button" type="button" data-autofocus>
+                <span class="cta__label">Play</span>
+              </button>
+
+              <div class="home-actions">
+                <button class="pill" id="settings-button" type="button">Settings</button>
+                <button class="pill" id="about-button" type="button">About</button>
               </div>
+
               <dl class="stats" id="menu-stats"></dl>
               <div class="leaderboard" id="menu-leaderboard"></div>
             </section>
@@ -104,13 +113,8 @@
               </p>
               <p class="screen__best" id="best-banner" hidden>New personal best</p>
               <div class="screen__actions">
-                <button
-                  class="button button--primary"
-                  id="again-button"
-                  type="button"
-                  data-autofocus
-                >
-                  Play again
+                <button class="cta cta--compact" id="again-button" type="button" data-autofocus>
+                  <span class="cta__label">Play again</span>
                 </button>
                 <button class="button" id="menu-button" type="button">Main menu</button>
               </div>

@@ -19,6 +19,31 @@ async function snapshot(page: Page): Promise<DebugSnapshot> {
   });
 }
 
+/**
+ * Flies the ship across the field until it is destroyed.
+ *
+ * Parking in the middle and waiting for a meteor to happen to land on you is a
+ * coin flip that can take a very long time; sweeping across traffic makes the
+ * crash prompt and the test predictable.
+ */
+async function crashTheShip(page: Page): Promise<void> {
+  const box = await page.locator('#game').boundingBox();
+  expect(box).not.toBeNull();
+  if (box === null) return;
+
+  const started = Date.now();
+  while (Date.now() - started < 80_000) {
+    const t = (Date.now() - started) / 1000;
+    await page.mouse.move(
+      box.x + box.width * (0.5 + Math.sin(t * 2.2) * 0.42),
+      box.y + box.height * 0.42,
+    );
+    await page.waitForTimeout(16);
+    if ((await snapshot(page)).phase === 'gameOver') return;
+  }
+  throw new Error('ship survived the whole sweep; expected a collision');
+}
+
 /** Waits until the game leaves the countdown and is actually simulating. */
 async function startRun(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Play' }).click();
@@ -109,13 +134,7 @@ test('ends the run with an in-page screen, never a native alert', async ({ page 
 
   await startRun(page);
 
-  // Sit still in the middle of the field until something hits.
-  const box = await page.locator('#game').boundingBox();
-  if (box !== null) {
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  }
-
-  await expect.poll(async () => (await snapshot(page)).phase, { timeout: 90_000 }).toBe('gameOver');
+  await crashTheShip(page);
 
   await expect(page.getByRole('heading', { name: 'Run over' })).toBeVisible();
   expect(nativeDialog).toBe(false);
@@ -125,11 +144,7 @@ test('persists the best score across a reload', async ({ page }) => {
   await startRun(page);
   await page.waitForTimeout(2500);
 
-  const box = await page.locator('#game').boundingBox();
-  if (box !== null) {
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  }
-  await expect.poll(async () => (await snapshot(page)).phase, { timeout: 90_000 }).toBe('gameOver');
+  await crashTheShip(page);
 
   const stored = await page.evaluate(() => localStorage.getItem('dodge-asteroid:profile'));
   expect(stored).not.toBeNull();
@@ -142,10 +157,7 @@ test('persists the best score across a reload', async ({ page }) => {
 
 test('restarts from the game-over screen', async ({ page }) => {
   await startRun(page);
-  const box = await page.locator('#game').boundingBox();
-  if (box !== null) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-
-  await expect.poll(async () => (await snapshot(page)).phase, { timeout: 90_000 }).toBe('gameOver');
+  await crashTheShip(page);
 
   await page.getByRole('button', { name: 'Play again' }).click();
   await expect.poll(async () => (await snapshot(page)).phase, { timeout: 15_000 }).toBe('playing');

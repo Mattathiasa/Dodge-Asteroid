@@ -20,6 +20,7 @@ import { createAudioEngine } from './audio/audio.js';
 import { createEventBuffer } from './game/events.js';
 import { createRng, randomSeed } from './core/rng.js';
 import { createWorld, resetRun } from './game/world.js';
+import { updateAttract } from './game/attract.js';
 import { loadProfile, recordRun, saveProfile } from './storage/storage.js';
 import { renderLeaderboard } from './ui/leaderboard.js';
 import { update } from './game/update.js';
@@ -180,6 +181,11 @@ function start(): void {
 
   function onPhaseChange(previous: Phase, next: Phase): void {
     if (next === 'countdown') beginRun();
+    if (next === 'menu') {
+      // Hand the field back to the attract backdrop.
+      resetRun(world, randomSeed());
+      loop.resync();
+    }
     if (next === 'playing' && previous === 'paused') loop.resync();
     if (next === 'gameOver') {
       finishRun();
@@ -246,6 +252,12 @@ function start(): void {
       if (!reducedMotion) renderer.updateBackground(dt);
       updateCamera(camera, dt, shakeRng);
 
+      if (phase === 'menu') {
+        // Keep meteors drifting behind the title screen.
+        updateAttract(world, dt);
+        return;
+      }
+
       if (!isSimulating(phase)) return;
 
       if (phase === 'countdown') {
@@ -266,7 +278,7 @@ function start(): void {
     },
 
     render: (alpha) => {
-      renderer.draw(world, alpha, viewport, camera);
+      renderer.draw(world, alpha, viewport, camera, phase !== 'menu');
       hud.update(world, profile.bestScore);
     },
   });

@@ -33,6 +33,8 @@ export interface Asteroid extends Body {
   rotSpeed: number;
   /** Index into the renderer's silhouette table. */
   shape: number;
+  /** Index into the renderer's colour families. */
+  skin: number;
   /** Whether this asteroid has already been scored as dodged. */
   scored: boolean;
   /** Whether a near-miss bonus has already been awarded for it. */
@@ -85,6 +87,7 @@ export function createAsteroid(): Asteroid {
     rot: 0,
     rotSpeed: 0,
     shape: 0,
+    skin: 0,
     scored: false,
     nearMissed: false,
   };

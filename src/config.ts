@@ -139,7 +139,9 @@ export const SPAWN = {
   asteroidCapacity: 64,
   powerUpCapacity: 8,
   /** Distinct asteroid silhouettes. */
-  shapeCount: 5,
+  shapeCount: 6,
+  /** Distinct asteroid colour families. */
+  skinCount: 5,
 } as const;
 
 /** Named colours, so the palette can be changed in one edit. */

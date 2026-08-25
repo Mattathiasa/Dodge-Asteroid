@@ -93,6 +93,7 @@ function maybeSpawn(world: World, difficulty: ReturnType<typeof difficultyAt>): 
     a.rot = 0;
     a.rotSpeed = spec.rotSpeed;
     a.shape = spec.shape;
+    a.skin = spec.skin;
     a.scored = false;
     a.nearMissed = false;
   });

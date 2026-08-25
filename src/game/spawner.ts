@@ -11,6 +11,7 @@ export interface AsteroidSpec {
   r: number;
   rotSpeed: number;
   shape: number;
+  skin: number;
 }
 
 export interface PowerUpSpec {
@@ -52,6 +53,7 @@ export function makeAsteroidSpec(
     r,
     rotSpeed: rng.range(-2.2, 2.2),
     shape: rng.int(0, SPAWN.shapeCount - 1),
+    skin: rng.int(0, SPAWN.skinCount - 1),
   };
 }
 

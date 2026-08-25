@@ -13,6 +13,7 @@
   --edge: rgba(120, 132, 220, 0.28);
   --radius: 14px;
   --font: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --font-display: 'Fredoka', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
 }
 
@@ -528,4 +529,211 @@ kbd {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ==========================================================================
+   Title screen
+   ========================================================================== */
+
+.screen--home {
+  /* The attract-mode meteor field shows through, so the panel is quieter than
+     the others and lets the game itself be the backdrop. */
+  background: linear-gradient(180deg, rgba(16, 20, 58, 0.82), rgba(8, 10, 31, 0.9));
+  border-color: rgba(120, 132, 220, 0.35);
+}
+
+.logo {
+  margin: 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.logo__line {
+  position: relative;
+  background: linear-gradient(180deg, #ffffff 8%, var(--cyan) 52%, #1d8fc4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.logo__line--top {
+  font-size: clamp(2.1rem, 10vw, 3.1rem);
+}
+
+.logo__line--bottom {
+  font-size: clamp(1.45rem, 6.8vw, 2.15rem);
+  letter-spacing: 0.16em;
+}
+
+/* A dark stroke behind the gradient fill, which is what makes an arcade logo
+   read against a busy background. */
+.logo__line::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: transparent;
+  -webkit-text-stroke: 7px #05010f;
+  text-shadow:
+    0 3px 0 #05010f,
+    0 0 26px rgba(79, 240, 255, 0.5);
+}
+
+/* ==========================================================================
+   Chunky call-to-action button
+   ========================================================================== */
+
+.cta {
+  position: relative;
+  display: inline-block;
+  min-width: 190px;
+  margin: 4px 0 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #0d3d52, #06202c);
+  cursor: pointer;
+  /* The offset lower layer is the button's "thickness". */
+  box-shadow:
+    0 6px 0 #06202c,
+    0 12px 22px rgba(0, 0, 0, 0.45);
+  transition:
+    transform 90ms ease,
+    box-shadow 90ms ease;
+}
+
+.cta__label {
+  display: block;
+  padding: 13px 30px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #8dfaff 0%, var(--cyan) 42%, #17a8d6 100%);
+  color: #04222e;
+  font-family: var(--font-display);
+  font-size: 1.16rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75);
+}
+
+.cta:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 7px 0 #06202c,
+    0 14px 26px rgba(0, 0, 0, 0.5);
+}
+
+.cta:active {
+  transform: translateY(5px);
+  box-shadow:
+    0 1px 0 #06202c,
+    0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.cta--compact {
+  min-width: 160px;
+}
+
+.cta--compact .cta__label {
+  padding: 11px 24px;
+  font-size: 1rem;
+}
+
+.home-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pill {
+  padding: 8px 18px;
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 90ms ease;
+}
+
+.pill:hover {
+  border-color: var(--cyan);
+  background: rgba(79, 240, 255, 0.12);
+}
+
+.pill:active {
+  transform: translateY(2px);
+}
+
+/* Headings and buttons pick up the display face throughout. */
+.screen__title,
+.topbar__title,
+.button,
+.screen__score {
+  font-family: var(--font-display);
+}
+
+.button {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.button:active {
+  transform: translateY(2px);
+}
+
+/* The menu owns the branding, so the top bar title steps aside for it. */
+body[data-screen='menu'] .topbar__title {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.topbar__title {
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta,
+  .pill,
+  .button,
+  .topbar__title {
+    transition: none;
+  }
+}
+
+/* The title screen is meant to show the game behind it, so its scrim is much
+   lighter than the pause and game-over ones. The panel itself stays opaque
+   enough to keep the text readable over moving meteors. */
+body[data-screen='menu'] .stage.has-overlay .overlays {
+  background: linear-gradient(180deg, rgba(8, 10, 31, 0.35), rgba(8, 10, 31, 0.55));
+  backdrop-filter: blur(1px);
+}
+
+/* A title screen should not show a live HUD. It stays visible while paused and
+   on game over, where the numbers are still the player's own run. */
+body[data-screen='menu'] .hud,
+body[data-screen='settings'] .hud,
+body[data-screen='about'] .hud {
+  opacity: 0;
+}
+
+.hud {
+  transition: opacity 200ms ease;
 }

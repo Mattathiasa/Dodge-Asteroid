@@ -13,6 +13,10 @@ const launchOptions = existsSync(PREINSTALLED_CHROMIUM)
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // Several specs wait on real gameplay (surviving, then being hit), which
+  // takes tens of seconds. The default 30s cap is shorter than those waits,
+  // so they could only ever pass by luck.
+  timeout: 120_000,
   fullyParallel: false,
   forbidOnly: Boolean(process.env['CI']),
   retries: process.env['CI'] ? 2 : 0,

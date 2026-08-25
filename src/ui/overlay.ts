@@ -32,6 +32,7 @@ export class OverlayManager {
       element.hidden = key !== name;
     }
     this.root.classList.add('has-overlay');
+    document.body.dataset['screen'] = name;
 
     // Move focus into the screen so keyboard and screen-reader users land there.
     const focusTarget = this.screens[name].querySelector<HTMLElement>('[data-autofocus]');
@@ -44,6 +45,7 @@ export class OverlayManager {
     this.current = null;
     for (const element of Object.values(this.screens)) element.hidden = true;
     this.root.classList.remove('has-overlay');
+    delete document.body.dataset['screen'];
   }
 
   /** Returns to whichever screen was showing before the current one. */

@@ -2,25 +2,16 @@ import type { Camera } from './camera.js';
 import type { Viewport } from '../core/viewport.js';
 import type { World } from '../game/world.js';
 import type { PowerUpKind } from '../game/entities.js';
-import { PALETTE, SHIP, SPAWN, WORLD } from '../config.js';
-import { TAU, lerp } from '../core/math.js';
+import { DIFFICULTY, PALETTE, SHIP, WORLD } from '../config.js';
+import { TAU, clamp, clamp01, lerp } from '../core/math.js';
 import { Starfield } from './starfield.js';
 import { createRng } from '../core/rng.js';
-
-/** Pre-generated asteroid silhouettes: per-shape radius multipliers. */
-const SHAPES: readonly (readonly number[])[] = buildShapes();
-
-function buildShapes(): number[][] {
-  const rng = createRng(0xa57e401d);
-  return Array.from({ length: SPAWN.shapeCount }, () => {
-    const points = rng.int(7, 10);
-    return Array.from({ length: points }, () => rng.range(0.76, 1.16));
-  });
-}
+import { drawMeteor } from './meteors.js';
 
 export class Renderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly starfield: Starfield;
+  private time = 0;
   effectsEnabled = true;
 
   constructor(
@@ -45,10 +36,11 @@ export class Renderer {
   }
 
   updateBackground(dt: number): void {
+    this.time += dt;
     this.starfield.update(dt);
   }
 
-  draw(world: World, alpha: number, viewport: Viewport, camera: Camera): void {
+  draw(world: World, alpha: number, viewport: Viewport, camera: Camera, showShip = true): void {
     const { ctx } = this;
 
     ctx.setTransform(viewport.dpr, 0, 0, viewport.dpr, 0, 0);
@@ -68,7 +60,7 @@ export class Renderer {
     this.starfield.draw(ctx);
     this.drawPowerUps(ctx, world, alpha);
     this.drawAsteroids(ctx, world, alpha);
-    this.drawShip(ctx, world, alpha);
+    if (showShip) this.drawShip(ctx, world, alpha);
     this.drawParticles(ctx, world, alpha);
 
     ctx.restore();
@@ -89,47 +81,22 @@ export class Renderer {
     ctx.fillRect(0, 0, WORLD.width, WORLD.height);
   }
 
-  private glow(ctx: CanvasRenderingContext2D, color: string, blur: number): void {
-    if (!this.effectsEnabled) return;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = blur;
-  }
-
-  private clearGlow(ctx: CanvasRenderingContext2D): void {
-    ctx.shadowBlur = 0;
-  }
-
   private drawAsteroids(ctx: CanvasRenderingContext2D, world: World, alpha: number): void {
     world.asteroids.forEach((a) => {
-      const x = lerp(a.px, a.x, alpha);
-      const y = lerp(a.py, a.y, alpha);
-      const shape = SHAPES[a.shape % SHAPES.length] ?? [1];
-
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(a.rot);
-
-      ctx.beginPath();
-      for (let i = 0; i < shape.length; i += 1) {
-        const angle = (i / shape.length) * TAU;
-        const radius = a.r * (shape[i] ?? 1);
-        const px = Math.cos(angle) * radius;
-        const py = Math.sin(angle) * radius;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-
-      ctx.fillStyle = PALETTE.asteroidCore;
-      ctx.fill();
-
-      this.glow(ctx, PALETTE.asteroidGlow, 14);
-      ctx.strokeStyle = PALETTE.asteroid;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      this.clearGlow(ctx);
-
-      ctx.restore();
+      drawMeteor(ctx, {
+        x: lerp(a.px, a.x, alpha),
+        y: lerp(a.py, a.y, alpha),
+        r: a.r,
+        rotation: a.rot,
+        // The tail trails the direction of travel, so it follows the sideways
+        // drift as well as the fall.
+        heading: Math.atan2(a.vy, a.vx),
+        speedRatio: clamp01(Math.hypot(a.vx, a.vy) / DIFFICULTY.absoluteMaxSpeed),
+        shape: a.shape,
+        skin: a.skin,
+        time: this.time,
+        effects: this.effectsEnabled,
+      });
     });
   }
 
@@ -138,22 +105,43 @@ export class Renderer {
       const x = lerp(p.px, p.x, alpha);
       const y = lerp(p.py, p.y, alpha);
       const color = powerUpColor(p.kind);
-      const pulse = 1 + Math.sin(p.age * 6) * 0.08;
+      const bob = Math.sin(p.age * 3.4) * p.r * 0.14;
+      const pulse = 1 + Math.sin(p.age * 6) * 0.07;
 
       ctx.save();
-      ctx.translate(x, y);
+      ctx.translate(x, y + bob);
       ctx.scale(pulse, pulse);
 
-      this.glow(ctx, color, 18);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2.5;
+      // Glossy capsule, so pickups read as rewards rather than hazards.
+      if (this.effectsEnabled) {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = p.r * 1.6;
+      }
+
+      const orb = ctx.createRadialGradient(-p.r * 0.32, -p.r * 0.36, p.r * 0.1, 0, 0, p.r * 1.15);
+      orb.addColorStop(0, '#ffffff');
+      orb.addColorStop(0.4, color);
+      orb.addColorStop(1, shade(color));
+
       ctx.beginPath();
       ctx.arc(0, 0, p.r, 0, TAU);
-      ctx.stroke();
-      this.clearGlow(ctx);
+      ctx.fillStyle = orb;
+      ctx.fill();
+      ctx.shadowBlur = 0;
 
-      ctx.fillStyle = color;
+      ctx.strokeStyle = '#0a1030';
+      ctx.lineWidth = Math.max(1, p.r * 0.13);
+      ctx.stroke();
+
+      ctx.fillStyle = '#0a1030';
       drawPowerUpGlyph(ctx, p.kind, p.r);
+
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(-p.r * 0.34, -p.r * 0.42, p.r * 0.26, p.r * 0.15, -0.6, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
 
       ctx.restore();
     });
@@ -161,10 +149,10 @@ export class Renderer {
 
   private drawShip(ctx: CanvasRenderingContext2D, world: World, alpha: number): void {
     const { ship } = world;
+    if (!ship.alive) return;
+
     const x = lerp(ship.px, ship.x, alpha);
     const y = lerp(ship.py, ship.y, alpha);
-
-    if (!ship.alive) return;
 
     if (this.effectsEnabled) this.drawTrail(ctx, world);
 
@@ -173,37 +161,112 @@ export class Renderer {
 
     ctx.save();
     ctx.translate(x, y);
+    // Bank into the direction of travel; it makes the craft feel like it has
+    // mass rather than sliding around flat.
+    ctx.rotate(clamp(ship.vx / SHIP.maxSpeed, -1, 1) * 0.42);
 
     if (!blinking) {
-      this.glow(ctx, PALETTE.shipGlow, 20);
-      ctx.fillStyle = PALETTE.ship;
-      ctx.beginPath();
-      ctx.arc(0, 0, ship.r, 0, TAU);
-      ctx.fill();
-      this.clearGlow(ctx);
-
-      ctx.fillStyle = PALETTE.background;
-      ctx.beginPath();
-      ctx.arc(0, 0, ship.r * 0.45, 0, TAU);
-      ctx.fill();
+      this.drawEngineFlame(ctx, ship.r);
+      this.drawHull(ctx, ship.r);
     }
 
     if (ship.shieldTime > 0) {
       const fading = ship.shieldTime < 1.5 && Math.floor(ship.shieldTime * 8) % 2 === 0;
-      if (!fading) {
-        this.glow(ctx, PALETTE.shield, 16);
-        ctx.strokeStyle = PALETTE.shield;
-        ctx.lineWidth = 2;
-        ctx.globalAlpha = 0.85;
-        ctx.beginPath();
-        ctx.arc(0, 0, ship.r + 9, 0, TAU);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        this.clearGlow(ctx);
-      }
+      if (!fading) this.drawShieldBubble(ctx, ship.r);
     }
 
     ctx.restore();
+  }
+
+  private drawEngineFlame(ctx: CanvasRenderingContext2D, r: number): void {
+    const flicker = 1 + Math.sin(this.time * 26) * 0.18;
+    const length = r * 1.7 * flicker;
+
+    const flame = ctx.createLinearGradient(0, r * 0.5, 0, r * 0.5 + length);
+    flame.addColorStop(0, '#ffffff');
+    flame.addColorStop(0.35, PALETTE.shipGlow);
+    flame.addColorStop(1, 'transparent');
+
+    if (this.effectsEnabled) {
+      ctx.shadowColor = PALETTE.shipGlow;
+      ctx.shadowBlur = r * 1.4;
+    }
+    ctx.fillStyle = flame;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.42, r * 0.5);
+    ctx.quadraticCurveTo(-r * 0.2, r * 0.5 + length, 0, r * 0.5 + length);
+    ctx.quadraticCurveTo(r * 0.2, r * 0.5 + length, r * 0.42, r * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  private drawHull(ctx: CanvasRenderingContext2D, r: number): void {
+    if (this.effectsEnabled) {
+      ctx.shadowColor = PALETTE.shipGlow;
+      ctx.shadowBlur = r * 1.6;
+    }
+
+    // Swept-back hull.
+    const hull = ctx.createLinearGradient(0, -r * 1.3, 0, r);
+    hull.addColorStop(0, '#ffffff');
+    hull.addColorStop(0.45, PALETTE.ship);
+    hull.addColorStop(1, '#1478a8');
+
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 1.35);
+    ctx.quadraticCurveTo(r * 0.72, -r * 0.1, r * 1.02, r * 0.72);
+    ctx.quadraticCurveTo(r * 0.4, r * 0.42, 0, r * 0.6);
+    ctx.quadraticCurveTo(-r * 0.4, r * 0.42, -r * 1.02, r * 0.72);
+    ctx.quadraticCurveTo(-r * 0.72, -r * 0.1, 0, -r * 1.35);
+    ctx.closePath();
+    ctx.fillStyle = hull;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#06304a';
+    ctx.lineWidth = Math.max(1, r * 0.13);
+    ctx.stroke();
+
+    // Cockpit.
+    ctx.fillStyle = '#0a2440';
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.34, r * 0.3, r * 0.44, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#bff6ff';
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.09, -r * 0.46, r * 0.13, r * 0.2, -0.4, 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  private drawShieldBubble(ctx: CanvasRenderingContext2D, r: number): void {
+    const radius = r + 9;
+    const bubble = ctx.createRadialGradient(0, 0, radius * 0.6, 0, 0, radius);
+    bubble.addColorStop(0, 'transparent');
+    bubble.addColorStop(1, PALETTE.shield);
+
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = bubble;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, TAU);
+    ctx.fill();
+
+    if (this.effectsEnabled) {
+      ctx.shadowColor = PALETTE.shield;
+      ctx.shadowBlur = 14;
+    }
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = PALETTE.shield;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, TAU);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
   }
 
   private drawTrail(ctx: CanvasRenderingContext2D, world: World): void {
@@ -237,6 +300,15 @@ export class Renderer {
     });
     ctx.restore();
   }
+}
+
+/** Darkens a #rrggbb colour, for the shaded side of a glossy orb. */
+function shade(hex: string): string {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const r = Math.round(((value >> 16) & 0xff) * 0.45);
+  const g = Math.round(((value >> 8) & 0xff) * 0.45);
+  const b = Math.round((value & 0xff) * 0.45);
+  return `rgb(${String(r)}, ${String(g)}, ${String(b)})`;
 }
 
 function powerUpColor(kind: PowerUpKind): string {

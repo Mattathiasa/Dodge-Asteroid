@@ -29,9 +29,11 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   {
+    // Command-line utilities; printing to stdout is the point.
     files: ['scripts/**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
+    rules: { 'no-console': 'off' },
   },
   {
     files: ['**/*.test.ts', 'tests/**/*.ts'],

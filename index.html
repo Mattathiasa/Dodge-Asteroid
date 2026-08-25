@@ -1,36 +1,185 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>Dodge Asteroid</title>
+    <meta
+      name="description"
+      content="A neon arcade dodging game built with TypeScript and Canvas 2D. Survive the asteroid field with mouse, touch or keyboard."
+    />
+    <meta name="theme-color" content="#080a1f" />
 
-<head>
-  <title>Dodge Asteroid Game</title>
-  <link rel="stylesheet" type="text/css" href="styles.css">
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Dodge Asteroid" />
+    <meta
+      property="og:description"
+      content="A neon arcade dodging game built with TypeScript and Canvas 2D."
+    />
+    <meta property="og:url" content="https://mattathiasa.github.io/Dodge-Asteroid/" />
+    <meta name="twitter:card" content="summary_large_image" />
 
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23080a1f'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%234ff0ff'/%3E%3Ccircle cx='10' cy='8' r='3.4' fill='%23ff4fa3'/%3E%3Ccircle cx='23' cy='11' r='2.6' fill='%23ff4fa3'/%3E%3C/svg%3E"
+    />
+  </head>
 
-</head>
+  <body>
+    <div id="app" class="app">
+      <header class="topbar">
+        <h1 class="topbar__title">Dodge&nbsp;Asteroid</h1>
+        <button id="mute-button" class="icon-button" type="button" aria-pressed="false">
+          Sound<span class="icon-button__state" id="mute-state">on</span>
+        </button>
+      </header>
 
-<body>
-  <nav>
-    <h2>Dodge Asteroid</h2>
-  </nav>
-  <div id="box">
-    <div id="game-box">
-      <div id="ball"></div>
+      <div class="stage">
+        <canvas id="game" class="stage__canvas" aria-label="Game field" role="img"></canvas>
+
+        <div class="hud" aria-hidden="false">
+          <div class="hud__group">
+            <span class="hud__label">Score</span>
+            <span class="hud__value" id="hud-score">0</span>
+          </div>
+          <div class="hud__group hud__group--center">
+            <span class="hud__combo" id="hud-combo"></span>
+            <span class="hud__status" id="hud-status"></span>
+          </div>
+          <div class="hud__group hud__group--right">
+            <span class="hud__label">Best</span>
+            <span class="hud__value" id="hud-best">0</span>
+            <span class="hud__lives" id="hud-lives" aria-label="1 of 4 lives remaining">◆</span>
+          </div>
+        </div>
+
+        <!-- Screens are DOM overlays, not canvas-drawn, so their controls are
+             focusable, keyboard-operable and readable by screen readers. -->
+        <div class="overlays" id="overlays">
+          <section class="screen" id="screen-menu" aria-labelledby="menu-heading">
+            <h2 class="screen__title" id="menu-heading">Dodge Asteroid</h2>
+            <p class="screen__lede">
+              Survive the field. Move with the mouse, your finger, or
+              <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>.
+            </p>
+            <div class="screen__actions">
+              <button class="button button--primary" id="play-button" type="button" data-autofocus>
+                Play
+              </button>
+              <button class="button" id="settings-button" type="button">Settings</button>
+              <button class="button" id="about-button" type="button">About</button>
+            </div>
+            <dl class="stats" id="menu-stats"></dl>
+            <div class="leaderboard" id="menu-leaderboard"></div>
+          </section>
+
+          <section class="screen" id="screen-paused" aria-labelledby="paused-heading" hidden>
+            <h2 class="screen__title" id="paused-heading">Paused</h2>
+            <div class="screen__actions">
+              <button class="button button--primary" id="resume-button" type="button" data-autofocus>
+                Resume
+              </button>
+              <button class="button" id="restart-button" type="button">Restart</button>
+              <button class="button" id="quit-button" type="button">Main menu</button>
+            </div>
+          </section>
+
+          <section class="screen" id="screen-gameover" aria-labelledby="gameover-heading" hidden>
+            <h2 class="screen__title" id="gameover-heading">Run over</h2>
+            <p class="screen__result">
+              <span class="screen__score" id="final-score">0</span>
+              <span class="screen__meta" id="final-meta"></span>
+            </p>
+            <p class="screen__best" id="best-banner" hidden>New personal best</p>
+            <div class="screen__actions">
+              <button class="button button--primary" id="again-button" type="button" data-autofocus>
+                Play again
+              </button>
+              <button class="button" id="menu-button" type="button">Main menu</button>
+            </div>
+            <div class="leaderboard" id="gameover-leaderboard"></div>
+          </section>
+
+          <section class="screen" id="screen-settings" aria-labelledby="settings-heading" hidden>
+            <h2 class="screen__title" id="settings-heading">Settings</h2>
+            <div class="settings">
+              <label class="field">
+                <span class="field__label">Difficulty</span>
+                <select class="field__control" id="difficulty-select">
+                  <option value="easy">Relaxed</option>
+                  <option value="normal" selected>Normal</option>
+                  <option value="hard">Intense</option>
+                </select>
+              </label>
+              <label class="field field--switch">
+                <input type="checkbox" id="reduced-motion-toggle" />
+                <span class="field__label">Reduce motion and effects</span>
+              </label>
+              <label class="field field--switch">
+                <input type="checkbox" id="sound-toggle" checked />
+                <span class="field__label">Sound effects</span>
+              </label>
+            </div>
+            <div class="screen__actions">
+              <button class="button button--primary" id="settings-back" type="button" data-autofocus>
+                Back
+              </button>
+            </div>
+          </section>
+
+          <section class="screen" id="screen-about" aria-labelledby="about-heading" hidden>
+            <h2 class="screen__title" id="about-heading">About</h2>
+            <div class="prose">
+              <p>
+                <strong>Dodge Asteroid</strong> is a small arcade game: stay alive as the field
+                fills up. Score comes from time survived and asteroids dodged, and threading a
+                near miss builds a combo multiplier.
+              </p>
+              <p>
+                It is written in TypeScript and rendered with the Canvas 2D API, with no runtime
+                dependencies. The simulation runs on a fixed timestep, so it behaves identically at
+                any frame rate, and every random value comes from a seeded generator, which makes a
+                whole run reproducible in tests.
+              </p>
+              <p class="prose__controls">
+                <strong>Controls</strong> — move with the mouse, touch, arrow keys or
+                <kbd>WASD</kbd>. <kbd>P</kbd> or <kbd>Esc</kbd> pauses, <kbd>R</kbd> restarts,
+                <kbd>M</kbd> mutes.
+              </p>
+              <p>
+                Built by
+                <a href="https://github.com/Mattathiasa" rel="noopener noreferrer" target="_blank"
+                  >Mattathias Abraham</a
+                >. Source on
+                <a
+                  href="https://github.com/Mattathiasa/Dodge-Asteroid"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  >GitHub</a
+                >.
+              </p>
+            </div>
+            <div class="screen__actions">
+              <button class="button button--primary" id="about-back" type="button" data-autofocus>
+                Back
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <div class="countdown" id="countdown" aria-hidden="true"></div>
+      </div>
+
+      <footer class="footer">
+        <p class="footer__hint">
+          <kbd>P</kbd> pause · <kbd>R</kbd> restart · <kbd>M</kbd> mute
+        </p>
+      </footer>
     </div>
-    <div id="level-display">Level: 0</div>
-    <div>
-      <button id="start-button" class="button">Start</button>
-      <button id="reset-button" class="button">Reset</button>
-    </div>
 
-  </div>
-  <a class="about" href="aboutus.html">About-us</a>
+    <p class="visually-hidden" id="live-region" aria-live="polite" role="status"></p>
 
-
-  <script src="jquery.js"></script>
-  <script src="script.js"></script>
-  <script>
-
-  </script>
-</body>
-
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

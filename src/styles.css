@@ -1,0 +1,519 @@
+/* Palette mirrors src/config.ts PALETTE, so canvas and DOM stay in step. */
+:root {
+  --bg: #080a1f;
+  --bg-raised: #10143a;
+  --bg-glow: #1a1040;
+  --ink: #e8ecff;
+  --ink-dim: #9aa3d8;
+  --cyan: #4ff0ff;
+  --cyan-bright: #0affff;
+  --magenta: #ff4fa3;
+  --green: #7dffc4;
+  --amber: #ffd35c;
+  --edge: rgba(120, 132, 220, 0.28);
+  --radius: 14px;
+  --font: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  overflow: hidden;
+  /* Keeps the layout clear of notches and home indicators. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 12px 16px 8px;
+  gap: 10px;
+}
+
+/* ---------- top bar ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.topbar__title {
+  margin: 0;
+  font-size: clamp(1.1rem, 3.4vw, 1.6rem);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  text-shadow: 0 0 18px rgba(79, 240, 255, 0.45);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: var(--ink);
+  border-color: var(--cyan);
+}
+
+.icon-button__state {
+  color: var(--cyan);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- stage ---------- */
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  box-shadow:
+    0 0 0 1px rgba(8, 10, 31, 0.9),
+    0 22px 60px rgba(0, 0, 0, 0.55);
+}
+
+.stage__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Without this, dragging on a phone scrolls the page instead of steering. */
+  touch-action: none;
+}
+
+/* ---------- HUD ---------- */
+
+.hud {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  pointer-events: none;
+  font-family: var(--font-mono);
+}
+
+.hud__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hud__group--center {
+  align-items: center;
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+.hud__group--right {
+  align-items: flex-end;
+}
+
+.hud__label {
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.hud__value {
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.hud__lives {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  letter-spacing: 0.16em;
+  color: var(--magenta);
+}
+
+.hud__combo,
+.hud__status {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.hud__combo {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.hud__status {
+  color: var(--green);
+}
+
+.hud__combo.is-active,
+.hud__status.is-active {
+  opacity: 1;
+}
+
+/* ---------- countdown ---------- */
+
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: clamp(3rem, 14vw, 6rem);
+  font-weight: 700;
+  color: var(--cyan);
+  text-shadow: 0 0 34px rgba(79, 240, 255, 0.55);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.countdown.is-active {
+  opacity: 1;
+}
+
+/* ---------- overlays ---------- */
+
+.overlays {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  pointer-events: none;
+}
+
+.stage.has-overlay .overlays {
+  pointer-events: auto;
+  background: radial-gradient(circle at 50% 40%, rgba(26, 16, 64, 0.82), rgba(8, 10, 31, 0.94));
+  backdrop-filter: blur(3px);
+}
+
+.screen {
+  width: min(440px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 24px;
+  text-align: center;
+  background: rgba(16, 20, 58, 0.9);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+.screen__title {
+  margin: 0 0 8px;
+  font-size: clamp(1.4rem, 5vw, 2rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.screen__lede,
+.screen__meta {
+  margin: 0 0 18px;
+  color: var(--ink-dim);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.screen__result {
+  margin: 0 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.screen__score {
+  font-family: var(--font-mono);
+  font-size: clamp(2.2rem, 9vw, 3.2rem);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.screen__best {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ---------- buttons and fields ---------- */
+
+.button {
+  padding: 10px 20px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.button:hover {
+  border-color: var(--cyan);
+  background: rgba(79, 240, 255, 0.1);
+}
+
+.button--primary {
+  color: var(--bg);
+  background: var(--cyan);
+  border-color: var(--cyan);
+  font-weight: 600;
+}
+
+.button--primary:hover {
+  background: var(--cyan-bright);
+}
+
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.field--switch {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.field__label {
+  color: var(--ink-dim);
+}
+
+.field__control {
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--ink);
+  background: rgba(8, 10, 31, 0.8);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+}
+
+input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--cyan);
+}
+
+/* ---------- stats and leaderboard ---------- */
+
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  margin: 18px 0 0;
+  font-family: var(--font-mono);
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats dt {
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.stats dd {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.leaderboard {
+  margin-top: 16px;
+}
+
+.leaderboard__empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+}
+
+.leaderboard__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: rank;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+.leaderboard__item {
+  counter-increment: rank;
+  display: grid;
+  grid-template-columns: 1.6rem 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 7px;
+}
+
+.leaderboard__item::before {
+  content: counter(rank);
+  color: var(--ink-dim);
+  font-size: 0.72rem;
+}
+
+.leaderboard__score {
+  text-align: left;
+  color: var(--ink);
+}
+
+.leaderboard__time {
+  color: var(--ink-dim);
+}
+
+/* ---------- prose ---------- */
+
+.prose {
+  text-align: left;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
+.prose strong {
+  color: var(--ink);
+}
+
+.prose a {
+  color: var(--cyan);
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 1px;
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+}
+
+/* ---------- footer ---------- */
+
+.footer {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.footer__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+
+@media (max-width: 560px) {
+  .footer {
+    display: none;
+  }
+
+  .screen {
+    padding: 18px;
+  }
+}
+
+/* Honour the OS setting: no transitions, and the renderer drops shake,
+   trails and glow when this is active. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

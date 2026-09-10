@@ -48,6 +48,12 @@ Canvas 2D · zero runtime dependencies
 
 ## On a phone
 
+<p align="center">
+  <img src="docs/mobile/portrait-play.png" alt="Portrait: the field fills the screen with the HUD across the top" width="24%">
+  <img src="docs/mobile/portrait-menu.png" alt="Portrait: the title screen over drifting meteors" width="24%">
+  <img src="docs/mobile/landscape-play.png" alt="Landscape: the HUD sits in a rail beside the field" width="46%">
+</p>
+
 The mobile build is not a scaled-down desktop page:
 
 |                        |                                                                                                                                                                                                                                                                                                                                                     |

@@ -158,9 +158,15 @@ npm run build     # -> dist/
 npm run preview   # serve the production build
 ```
 
-`npm run build` produces about **31 KB of JavaScript, 11 KB gzipped**, with no
-runtime dependencies and no binary assets — the ship, the asteroids, the
-particles and every sound effect are generated at runtime.
+`npm run build` produces about **40 KB of JavaScript, 14 KB gzipped**, plus
+14 KB of CSS, with **no runtime dependencies**.
+
+Nothing the game draws or plays is an asset: the ship, the meteors, the
+particles and every sound effect are generated at runtime from code. The only
+binaries in the repository are the app icons and the README media, and both are
+produced by scripts here (`scripts/generate-icons.mjs`,
+`scripts/capture-media.mjs`, `scripts/capture-mobile.mjs`) rather than drawn by
+hand, so neither can drift from the game.
 
 To regenerate the media in this README:
 

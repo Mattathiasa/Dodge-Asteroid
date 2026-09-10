@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-sw.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
@@ -25,7 +25,8 @@
     "e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run test",
     "media": "node scripts/capture-media.mjs docs && node scripts/capture-store.mjs docs/store",
-    "decks": "node scripts/deck-case-study.cjs && node scripts/deck-design-directions.cjs"
+    "decks": "node scripts/deck-case-study.cjs && node scripts/deck-design-directions.cjs",
+    "icons": "node scripts/generate-icons.mjs public"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -22,6 +22,12 @@ Canvas 2D · zero runtime dependencies
   that vaporises what it touches, time dilation, and an extra life.
 - **Plays anywhere.** Mouse, touch, arrow keys or WASD. Touch steers a point
   above your finger, because a fingertip covers the ship otherwise.
+- **Installs as an app and plays offline.** A generated service worker precaches
+  the whole shell, so once it has loaded it runs with no network at all.
+- **Built for a phone, not just shrunk onto one.** In landscape the HUD moves
+  into the space beside the field instead of being squeezed over it; the screen
+  is kept awake during a run; impacts are felt through the vibration motor; and
+  fullscreen is offered where the platform supports it.
 - **Difficulty that plateaus** instead of running away.
 - **Local leaderboard**, personal bests, and difficulty presets, saved between
   sessions.
@@ -39,6 +45,28 @@ Canvas 2D · zero runtime dependencies
   <img src="docs/store/store-3.png" alt="Beat your best: scores are kept on your device" width="23%">
   <img src="docs/store/store-4.png" alt="Play it your way: difficulties, reduced motion, sound off" width="23%">
 </p>
+
+## On a phone
+
+<p align="center">
+  <img src="docs/mobile/portrait-play.png" alt="Portrait: the field fills the screen with the HUD across the top" width="24%">
+  <img src="docs/mobile/portrait-menu.png" alt="Portrait: the title screen over drifting meteors" width="24%">
+  <img src="docs/mobile/landscape-play.png" alt="Landscape: the HUD sits in a rail beside the field" width="46%">
+</p>
+
+The mobile build is not a scaled-down desktop page:
+
+|                        |                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Installable**        | A web app manifest with maskable icons, plus the iOS-specific meta Safari still needs. Add it to a home screen and it launches standalone, with no browser chrome.                                                                                                                                                                                  |
+| **Offline**            | `scripts/build-sw.mjs` reads the real `dist/` output after every build and generates a service worker around it, so the precache list can never drift from Vite's content-hashed filenames and a new build invalidates the old cache automatically. Google Fonts is cached at runtime, so an installed copy starts with the right typeface offline. |
+| **Landscape**          | The HUD is a rail beside the field rather than an overlay on top of it. A landscape phone cannot show a 2:3 field and a full-width HUD at once, so the chrome uses the gutter the field cannot.                                                                                                                                                     |
+| **Stays awake**        | A Screen Wake Lock is held for the duration of a run and released in menus — steering with a finger on a canvas registers no activity, so the phone would otherwise dim and lock mid-game.                                                                                                                                                          |
+| **Feels physical**     | Short, distinct vibration patterns for a pickup, a shield break, a lost life and a crash. Off by a toggle, and absent entirely where the platform has no vibration motor.                                                                                                                                                                           |
+| **No stray scrolling** | The viewport is locked and overscroll disabled, so a drag steers the ship instead of rubber-banding the page or triggering pull-to-refresh.                                                                                                                                                                                                         |
+
+Every one of those degrades to nothing rather than breaking: a browser with no
+service worker, no wake lock and no vibration still gets the whole game.
 
 ## How it is put together
 
@@ -93,7 +121,7 @@ A few details that matter more than they sound:
 ## Testing
 
 The simulation is a pure function of its seed, its input and its timestep, and
-that is what the tests cover: **153 unit tests** across the difficulty curve,
+that is what the tests cover: **159 unit tests** across the difficulty curve,
 collision (including the tunnelling case), scoring, spawning, the state machine,
 the loop, the object pool, persistence, and a sixty-second deterministic
 simulation of a whole run.
@@ -105,6 +133,11 @@ real built game** in Chromium and on an emulated phone: that the ship follows
 the mouse and the keyboard, that pausing genuinely freezes the world, that a run
 ends on an in-page screen, that the best score survives a reload, and that a tap
 steers on a touch screen.
+
+The mobile and offline behaviour is covered end to end rather than asserted in
+prose: one spec installs the service worker, drops the network, reloads, and
+plays a run with no connection; another checks the landscape HUD is fully on
+screen and that nothing scrolls the page sideways.
 
 ```bash
 npm run typecheck   # tsc --noEmit
@@ -125,9 +158,15 @@ npm run build     # -> dist/
 npm run preview   # serve the production build
 ```
 
-`npm run build` produces about **31 KB of JavaScript, 11 KB gzipped**, with no
-runtime dependencies and no binary assets — the ship, the asteroids, the
-particles and every sound effect are generated at runtime.
+`npm run build` produces about **40 KB of JavaScript, 14 KB gzipped**, plus
+14 KB of CSS, with **no runtime dependencies**.
+
+Nothing the game draws or plays is an asset: the ship, the meteors, the
+particles and every sound effect are generated at runtime from code. The only
+binaries in the repository are the app icons and the README media, and both are
+produced by scripts here (`scripts/generate-icons.mjs`,
+`scripts/capture-media.mjs`, `scripts/capture-mobile.mjs`) rather than drawn by
+hand, so neither can drift from the game.
 
 To regenerate the media in this README:
 
@@ -163,7 +202,7 @@ to avoid:
 | The ship rendered a full body-width away from the cursor                                                                                                                       | One tested coordinate mapping                                       |
 | Mouse only, with no viewport meta tag, so it could not be played on a phone                                                                                                    | Mouse, touch and keyboard                                           |
 | 86 KB of vendored jQuery carrying three CVEs                                                                                                                                   | No runtime dependencies                                             |
-| No tests, no CI, no licence                                                                                                                                                    | 153 unit tests, 12 e2e specs, CI on every push                      |
+| No tests, no CI, no licence                                                                                                                                                    | 159 unit tests, 18 e2e specs, CI on every push                      |
 
 ## Licence
 

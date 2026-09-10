@@ -47,6 +47,15 @@ describe('migrate', () => {
     expect(Array.isArray(profile.leaderboard)).toBe(true);
   });
 
+  it('defaults haptics on for profiles written before it existed', () => {
+    expect(migrate({ version: 1, bestScore: 10 }).haptics).toBe(true);
+  });
+
+  it('preserves an explicit haptics opt-out', () => {
+    expect(migrate({ version: 1, haptics: false }).haptics).toBe(false);
+    expect(migrate({ version: 1, haptics: true }).haptics).toBe(true);
+  });
+
   it('keeps valid values', () => {
     const profile = migrate({
       version: 1,

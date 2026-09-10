@@ -15,6 +15,7 @@ export interface Profile {
   readonly muted: boolean;
   /** `null` follows the operating system setting. */
   readonly reducedMotion: boolean | null;
+  readonly haptics: boolean;
   readonly leaderboard: readonly ScoreEntry[];
 }
 
@@ -27,6 +28,7 @@ export const DEFAULT_PROFILE: Profile = {
   runs: 0,
   muted: false,
   reducedMotion: null,
+  haptics: true,
   leaderboard: [],
 };
 
@@ -74,6 +76,9 @@ export function migrate(raw: unknown): Profile {
     runs: toCount(raw['runs']),
     muted: raw['muted'] === true,
     reducedMotion: typeof reducedMotion === 'boolean' ? reducedMotion : null,
+    // Absent in profiles written before haptics existed; those players opt in
+    // by default rather than silently losing the feature.
+    haptics: raw['haptics'] !== false,
     leaderboard: toEntries(raw['leaderboard']),
   };
 }

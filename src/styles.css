@@ -51,6 +51,10 @@ html,
 body {
   height: 100%;
   margin: 0;
+  /* This is a fixed-viewport game: nothing should ever scroll, and on a phone
+     overscroll would otherwise rubber-band or pull-to-refresh mid-drag. */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -165,6 +169,17 @@ body[data-screen='menu'] .topbar__title {
    letting it fit itself keeps the frame exactly the play field on any screen
    shape. Setting an explicit height here instead would lose the ratio the
    moment the width clamped, which left dead bands on tall phones. */
+.playfield {
+  position: relative;
+  display: flex;
+  /* Shrink-wraps the stage, so the HUD can be positioned against the real field
+     edge rather than the whole centred gutter. */
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 .stage {
   position: relative;
   max-width: 100%;
@@ -189,6 +204,8 @@ body[data-screen='menu'] .topbar__title {
 .hud {
   position: absolute;
   inset: 0 0 auto 0;
+  /* Sits over the field on tall screens; becomes a static rail beside it when
+     the screen is short and wide (see the landscape block below). */
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -442,6 +459,7 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
 .screen__actions {
   display: flex;
   flex-wrap: wrap;
+  max-width: 100%;
   justify-content: center;
   gap: 10px;
   margin-top: 18px;
@@ -492,7 +510,8 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
 .cta {
   position: relative;
   display: inline-block;
-  min-width: 200px;
+  min-width: min(200px, 100%);
+  max-width: 100%;
   margin: 4px 0 2px;
   padding: 0;
   border: 3px solid var(--ink);
@@ -533,7 +552,7 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
 }
 
 .cta--compact {
-  min-width: 170px;
+  min-width: min(170px, 100%);
 }
 
 .cta--compact .cta__label {
@@ -543,6 +562,7 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
 
 .home-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
   margin-top: 14px;
@@ -840,4 +860,164 @@ kbd {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ==========================================================================
+   Landscape phones
+   ==========================================================================
+   A short, wide screen cannot show a 2:3 field and a full-width HUD at once:
+   the field narrows to a strip and the HUD chips overflow it. Rather than
+   shrink the game, the chrome moves into the space beside the field, which on
+   a landscape phone is otherwise dead. */
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .app {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  /* The title is the largest thing competing for vertical space. */
+  .topbar {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    right: 12px;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .topbar__title {
+    font-size: 0.95rem;
+  }
+
+  .icon-button {
+    pointer-events: auto;
+  }
+
+  .stage-wrap {
+    padding-top: 34px;
+  }
+
+  .playfield {
+    /* Field and HUD side by side, the HUD in what would be empty gutter. */
+    flex-direction: row;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .hud {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 10px;
+    padding: 0;
+    width: 148px;
+    flex: 0 0 auto;
+  }
+
+  .hud__group,
+  .hud__group--right {
+    justify-content: center;
+  }
+
+  .hud__group--center {
+    flex: 0 0 auto;
+    min-height: 1.2em;
+  }
+
+  /* The keyboard hint is desktop-only guidance; a landscape phone has no room
+     for it and no keyboard to use it with. */
+  .footer {
+    display: none;
+  }
+
+  .screen {
+    padding: 14px 16px;
+    max-height: 100%;
+  }
+
+  .screen__title,
+  .logo__line--top {
+    font-size: clamp(1.2rem, 5vh, 1.9rem);
+  }
+
+  .logo__line--bottom {
+    font-size: clamp(0.85rem, 3.2vh, 1.25rem);
+  }
+
+  .screen__lede,
+  .leaderboard,
+  .stats {
+    display: none;
+  }
+}
+
+/* A pointer that cannot hover is a finger: the keyboard hint is noise. */
+@media (hover: none) and (pointer: coarse) {
+  .footer {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Platform controls
+   ========================================================================== */
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-button--icon {
+  padding: 7px 9px;
+  line-height: 0;
+}
+
+.icon-button--icon svg {
+  display: block;
+}
+
+/* A service-worker update is offered, never applied behind the player's back:
+   reloading mid-run would cost them the game. */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 5px 0 var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  max-width: calc(100vw - 32px);
+}
+
+.update-banner[hidden] {
+  display: none;
+}
+
+.update-banner__action {
+  padding: 7px 15px;
+  font: inherit;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  background: var(--ember);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.update-banner__action:active {
+  transform: translateY(2px);
 }

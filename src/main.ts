@@ -21,6 +21,10 @@ import { createEventBuffer } from './game/events.js';
 import { createRng, randomSeed } from './core/rng.js';
 import { createWorld, resetRun } from './game/world.js';
 import { updateAttract } from './game/attract.js';
+import { createHaptics } from './platform/haptics.js';
+import { createWakeLock } from './platform/wakeLock.js';
+import { isFullscreen, isFullscreenSupported, toggleFullscreen } from './platform/fullscreen.js';
+import { registerServiceWorker } from './platform/serviceWorker.js';
 import { loadProfile, recordRun, saveProfile } from './storage/storage.js';
 import { renderLeaderboard } from './ui/leaderboard.js';
 import { update } from './game/update.js';
@@ -73,6 +77,8 @@ function start(): void {
   const shakeRng = createRng(0x51a2e);
   const events = createEventBuffer();
   const audio = createAudioEngine();
+  const haptics = createHaptics();
+  const wakeLock = createWakeLock();
   const input = new InputManager(canvas);
   const renderer = new Renderer(canvas, 0xbeef);
   const announcer = new Announcer(must<HTMLElement>('live-region'));
@@ -131,6 +137,18 @@ function start(): void {
   new ResizeObserver(resize).observe(wrap);
   window.addEventListener('orientationchange', resize);
   resize();
+
+  // The first call runs before the browser's first layout pass has settled, so
+  // it can fit the field to a stale container size. The observer corrects it,
+  // but a frame or two later — long enough to be visible, and long enough for
+  // the HUD to be laid out against a field that is briefly far too narrow.
+  requestAnimationFrame(resize);
+
+  // Web fonts change the header's height, which changes how much room the field
+  // gets. Re-fit once they are in rather than waiting for the observer.
+  if ('fonts' in document) {
+    void document.fonts.ready.then(resize).catch(() => undefined);
+  }
 
   // ---- preferences ----
   const applyMotionPreference = (): void => {
@@ -198,6 +216,11 @@ function start(): void {
       audio.play('gameOver');
     }
 
+    // The screen is only kept awake during a run: holding the lock in a menu
+    // would drain a phone sitting on a title screen.
+    if (isSimulating(next)) wakeLock.acquire();
+    else wakeLock.release();
+
     const screen = OverlayManager.forPhase(next);
     if (screen === null) overlays.hide();
     else overlays.show(screen);
@@ -214,21 +237,25 @@ function start(): void {
         break;
       case 'pickup':
         audio.play('pickup');
+        haptics.play('pickup');
         addTrauma(camera, CAMERA.traumaOnPickup);
         announcer.say(`${labelFor(event.kind)} collected.`);
         break;
       case 'shieldBreak':
         audio.play('shieldBreak');
+        haptics.play('shieldBreak');
         addTrauma(camera, CAMERA.traumaOnShieldBreak);
         announcer.say('Shield absorbed a hit.');
         break;
       case 'lifeLost':
         audio.play('lifeLost');
+        haptics.play('lifeLost');
         addTrauma(camera, CAMERA.traumaOnHit);
         announcer.sayNow(`Hit. ${String(event.livesLeft)} remaining.`);
         break;
       case 'destroyed':
         addTrauma(camera, CAMERA.traumaOnHit);
+        haptics.play('destroyed');
         break;
       case 'milestone':
         announcer.say(`${String(event.points)} points.`);
@@ -316,6 +343,9 @@ function start(): void {
     renderLeaderboard(must('menu-leaderboard'), profile.leaderboard);
   }
 
+  const fullscreenButton = must<HTMLButtonElement>('fullscreen-button');
+  const hapticsField = must<HTMLElement>('haptics-field');
+  const hapticsToggle = must<HTMLInputElement>('haptics-toggle');
   const difficultySelect = must<HTMLSelectElement>('difficulty-select');
   const reducedMotionToggle = must<HTMLInputElement>('reduced-motion-toggle');
   const soundToggle = must<HTMLInputElement>('sound-toggle');
@@ -349,6 +379,32 @@ function start(): void {
     applyMotionPreference();
     persist();
   });
+
+  // Fullscreen and vibration are only offered where the platform actually has
+  // them, rather than showing dead controls on a desktop browser.
+  const app = must<HTMLElement>('app');
+  if (isFullscreenSupported(app)) {
+    fullscreenButton.hidden = false;
+    const syncFullscreen = (): void => {
+      const active = isFullscreen();
+      fullscreenButton.setAttribute('aria-pressed', String(active));
+      fullscreenButton.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Enter fullscreen');
+    };
+    fullscreenButton.addEventListener('click', () => {
+      void toggleFullscreen(app).then(syncFullscreen);
+    });
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    syncFullscreen();
+  }
+
+  if (haptics.supported) {
+    hapticsField.hidden = false;
+    hapticsToggle.addEventListener('change', () => {
+      profile = { ...profile, haptics: hapticsToggle.checked };
+      haptics.enabled = hapticsToggle.checked;
+      persist();
+    });
+  }
 
   soundToggle.addEventListener('change', () => {
     profile = { ...profile, muted: !soundToggle.checked };
@@ -384,6 +440,8 @@ function start(): void {
   };
 
   // ---- go ----
+  hapticsToggle.checked = profile.haptics;
+  haptics.enabled = profile.haptics;
   reducedMotionToggle.checked = reducedMotion;
   difficultySelect.value = mode;
   applyMotionPreference();
@@ -393,6 +451,16 @@ function start(): void {
   overlays.show('menu');
   input.attach();
   loop.start();
+
+  // Installability and offline play. The banner is an explicit prompt: applying
+  // an update reloads the page, which must never happen mid-run.
+  registerServiceWorker((update) => {
+    const banner = document.getElementById('update-banner');
+    const apply = document.getElementById('update-apply');
+    if (banner === null || apply === null) return;
+    banner.hidden = false;
+    apply.addEventListener('click', () => update.apply(), { once: true });
+  });
 }
 
 function labelFor(kind: 'shield' | 'slowmo' | 'life'): string {

@@ -1,0 +1,843 @@
+/* ==========================================================================
+   Dodge Asteroid — "sticker arcade"
+
+   The meteors are drawn as glossy rocks with thick dark outlines, so the UI
+   chrome speaks the same language: ink outlines, warm cream panels, and hard
+   offset shadows that give controls real thickness. Cream on deep purple,
+   rather than yet more neon on black.
+
+   Canvas colours live in src/config.ts (PALETTE); these tokens mirror them so
+   the DOM and the play field stay in step.
+   ========================================================================== */
+
+:root {
+  --ink: #1b0b36;
+  --ink-soft: #6b4a86;
+
+  --cream: #fff3dc;
+  --cream-2: #f6e6c8;
+  --cream-edge: #d9c6a4;
+
+  --space-1: #241350;
+  --space-2: #150a35;
+  --space-3: #0a0620;
+  --space-text: #b6a7d6;
+
+  --ember: #f2792a;
+  --ember-light: #ffc46b;
+  --ember-dark: #a8330d;
+  --ember-shade: #8f2f0b;
+
+  --cyan: #4ff0ff;
+  --cyan-light: #9dfbff;
+  --cyan-shade: #10708a;
+
+  --amber: #ffd35c;
+  --green: #7dffc4;
+  --rose: #ff5fb4;
+  --rose-dark: #b81a76;
+
+  --radius: 20px;
+  --font: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-display: 'Bungee', 'Outfit', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--space-3);
+  color: var(--cream);
+  font-family: var(--font);
+  overflow: hidden;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 12px 16px 8px;
+  gap: 10px;
+}
+
+/* ---------- top bar ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.topbar__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 3.2vw, 1.35rem);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--cream);
+  -webkit-text-stroke: 3px var(--ink);
+  paint-order: stroke fill;
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+
+/* The title screen carries the branding, so the bar steps aside for it. */
+body[data-screen='menu'] .topbar__title {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 7px 15px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 4px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 90ms ease;
+}
+
+.icon-button:hover {
+  background: var(--cream-2);
+}
+
+.icon-button:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.icon-button__state {
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  color: var(--ember-dark);
+}
+
+/* ---------- stage ---------- */
+
+/* The stage is held at the world's aspect ratio and centred, so the frame the
+   player sees is the play field itself. The canvas still letterboxes inside,
+   which keeps very short or very narrow windows correct. */
+.stage-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The canvas carries the world's aspect ratio as its intrinsic size, so
+   letting it fit itself keeps the frame exactly the play field on any screen
+   shape. Setting an explicit height here instead would lose the ratio the
+   moment the width clamped, which left dead bands on tall phones. */
+.stage {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 4px solid var(--ink);
+  box-shadow:
+    0 8px 0 var(--ink),
+    0 22px 50px rgba(0, 0, 0, 0.55);
+}
+
+.stage__canvas {
+  display: block;
+  /* Sized in JS: see fitDisplaySize. */
+  /* Without this, dragging on a phone scrolls the page instead of steering. */
+  touch-action: none;
+}
+
+/* ---------- HUD ---------- */
+
+.hud {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+body[data-screen='menu'] .hud,
+body[data-screen='settings'] .hud,
+body[data-screen='about'] .hud {
+  opacity: 0;
+}
+
+.hud__group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hud__group--center {
+  align-items: center;
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+.hud__group--right {
+  align-items: flex-end;
+}
+
+/* Score sits on a cream chip so it stays readable over a bright meteor. */
+.hud__group:first-child {
+  align-items: flex-start;
+}
+
+.hud__label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.hud__value {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__group:first-child .hud__label,
+.hud__group:first-child .hud__value {
+  display: inline-block;
+}
+
+.hud__group:first-child {
+  padding: 7px 15px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 4px 0 var(--ink);
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hud__group--right {
+  padding: 6px 13px;
+  background: rgba(27, 11, 54, 0.62);
+  border: 2px solid rgba(255, 243, 220, 0.32);
+  border-radius: 999px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.hud__group--right .hud__label {
+  color: var(--space-text);
+}
+
+.hud__group--right .hud__value {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--cream);
+}
+
+.hud__lives {
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  color: var(--rose);
+  text-shadow: 0 1px 0 var(--ink);
+}
+
+.hud__combo,
+.hud__status {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.hud__combo {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  padding: 5px 13px;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--amber), #f2a72a);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--ember-dark);
+  transform: rotate(-3deg);
+}
+
+.hud__status {
+  margin-top: 6px;
+  padding: 4px 12px;
+  color: var(--green);
+  background: rgba(27, 11, 54, 0.72);
+  border: 2px solid var(--green);
+  border-radius: 999px;
+}
+
+.hud__combo.is-active,
+.hud__status.is-active {
+  opacity: 1;
+}
+
+/* ---------- countdown ---------- */
+
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 15vw, 6.5rem);
+  color: var(--cream);
+  -webkit-text-stroke: 10px var(--ink);
+  paint-order: stroke fill;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.countdown.is-active {
+  opacity: 1;
+}
+
+/* ---------- overlays ---------- */
+
+.overlays {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  pointer-events: none;
+}
+
+.stage.has-overlay .overlays {
+  pointer-events: auto;
+  background: rgba(10, 6, 32, 0.68);
+}
+
+/* The title screen shows the game behind it, so its scrim is much lighter. */
+body[data-screen='menu'] .stage.has-overlay .overlays {
+  background: linear-gradient(180deg, rgba(10, 6, 32, 0.34), rgba(10, 6, 32, 0.56));
+}
+
+.screen {
+  width: min(420px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 24px 20px 22px;
+  text-align: center;
+  background: var(--cream);
+  border: 4px solid var(--ink);
+  border-radius: 26px;
+  box-shadow:
+    0 9px 0 var(--ink),
+    0 22px 44px rgba(0, 0, 0, 0.5);
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+.screen--home {
+  background: linear-gradient(180deg, rgba(36, 19, 80, 0.9), rgba(10, 6, 32, 0.93));
+  border-color: var(--ink);
+}
+
+.screen__title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 6vw, 2rem);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.screen__lede {
+  margin: 0 0 18px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--space-text);
+}
+
+.screen:not(.screen--home) .screen__lede,
+.screen:not(.screen--home) .screen__meta {
+  color: var(--ink-soft);
+}
+
+.screen__result {
+  margin: 0 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.screen__score {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 11vw, 3.4rem);
+  line-height: 1.06;
+  color: var(--ink);
+}
+
+.screen__meta {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.screen__best {
+  display: inline-block;
+  margin: 10px 0 0;
+  padding: 6px 15px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--amber), #f2a72a);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--ember-dark);
+}
+
+.screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ---------- logo ---------- */
+
+.logo {
+  margin: 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 0.94;
+  text-transform: uppercase;
+}
+
+.logo__line {
+  transform: rotate(-2.5deg);
+}
+
+/* A real stroke painted behind the fill, rather than stacked shadows: those
+   ghost into a doubled word at any offset big enough to read as an outline. */
+.logo__line--top {
+  font-size: clamp(2.4rem, 12vw, 3.4rem);
+  color: var(--cream);
+  -webkit-text-stroke: 9px var(--ink);
+  paint-order: stroke fill;
+  text-shadow:
+    0 5px 0 var(--rose),
+    0 14px 26px rgba(0, 0, 0, 0.6);
+}
+
+.logo__line--bottom {
+  font-size: clamp(1.3rem, 6.6vw, 1.9rem);
+  letter-spacing: 0.13em;
+  color: var(--ember-light);
+  -webkit-text-stroke: 7px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- buttons ---------- */
+
+/* The offset lower layer is the button's thickness; pressing sinks into it. */
+.cta {
+  position: relative;
+  display: inline-block;
+  min-width: 200px;
+  margin: 4px 0 2px;
+  padding: 0;
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  background: linear-gradient(180deg, var(--ember-light) 0%, var(--ember) 55%, #dd5f14 100%);
+  box-shadow:
+    0 8px 0 var(--ember-shade),
+    0 16px 26px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition:
+    transform 90ms ease,
+    box-shadow 90ms ease;
+}
+
+.cta__label {
+  display: block;
+  padding: 15px 28px;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cream);
+  text-shadow: 0 3px 0 var(--ember-dark);
+}
+
+.cta:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 9px 0 var(--ember-shade),
+    0 18px 30px rgba(0, 0, 0, 0.5);
+}
+
+.cta:active {
+  transform: translateY(7px);
+  box-shadow:
+    0 1px 0 var(--ember-shade),
+    0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.cta--compact {
+  min-width: 170px;
+}
+
+.cta--compact .cta__label {
+  padding: 13px 22px;
+  font-size: 1.1rem;
+}
+
+.home-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pill,
+.button {
+  min-height: 46px;
+  padding: 12px 20px;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 0 5px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 90ms ease;
+}
+
+.pill:hover,
+.button:hover {
+  background: var(--cream-2);
+}
+
+.pill:active,
+.button:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.button--primary {
+  color: #06304a;
+  background: linear-gradient(180deg, var(--cyan-light) 0%, var(--cyan) 55%, #22c3e0 100%);
+  box-shadow: 0 6px 0 var(--cyan-shade);
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.button--primary:hover {
+  background: linear-gradient(180deg, #b6fdff 0%, var(--cyan) 55%, #29cfe8 100%);
+}
+
+.button--primary:active {
+  box-shadow: 0 1px 0 var(--cyan-shade);
+}
+
+:focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 3px;
+}
+
+/* ---------- settings ---------- */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 15px;
+  font-size: 0.9rem;
+  background: var(--cream-2);
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+}
+
+.field--switch {
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+}
+
+.field__label {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.field__control {
+  min-height: 42px;
+  padding: 9px 11px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+}
+
+input[type='checkbox'] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--ember);
+}
+
+/* ---------- stats and leaderboard ---------- */
+
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 18px 0 0;
+  padding: 13px 0;
+  border-top: 2px dashed rgba(255, 243, 220, 0.25);
+  border-bottom: 2px dashed rgba(255, 243, 220, 0.25);
+}
+
+.screen:not(.screen--home) .stats {
+  border-color: var(--cream-edge);
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats dt {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--space-text);
+}
+
+.stats dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--cream);
+}
+
+.screen:not(.screen--home) .stats dt {
+  color: var(--ink-soft);
+}
+
+.screen:not(.screen--home) .stats dd {
+  color: var(--ink);
+}
+
+.leaderboard {
+  margin-top: 16px;
+}
+
+.leaderboard__empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--space-text);
+}
+
+.screen:not(.screen--home) .leaderboard__empty {
+  color: var(--ink-soft);
+}
+
+.leaderboard__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: rank;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.leaderboard__item {
+  counter-increment: rank;
+  display: grid;
+  grid-template-columns: 1.5rem 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  background: var(--cream-2);
+  border: 2px solid var(--cream-edge);
+  border-radius: 12px;
+}
+
+.leaderboard__item:first-child {
+  background: linear-gradient(90deg, #ffe6a8, #ffd889);
+  border-color: var(--ink);
+}
+
+.screen--home .leaderboard__item {
+  background: rgba(255, 243, 220, 0.09);
+  border-color: rgba(255, 243, 220, 0.22);
+}
+
+.screen--home .leaderboard__item:first-child {
+  background: rgba(255, 211, 92, 0.18);
+  border-color: rgba(255, 211, 92, 0.55);
+}
+
+.leaderboard__item::before {
+  content: counter(rank);
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+
+.screen--home .leaderboard__item::before {
+  color: var(--space-text);
+}
+
+.leaderboard__score {
+  text-align: left;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard__time {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.screen--home .leaderboard__score {
+  color: var(--cream);
+}
+
+.screen--home .leaderboard__time {
+  color: var(--space-text);
+}
+
+/* ---------- prose ---------- */
+
+.prose {
+  text-align: left;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+.prose strong {
+  color: var(--ink);
+}
+
+.prose a {
+  color: var(--ember-dark);
+  font-weight: 700;
+}
+
+.prose a:hover {
+  color: var(--ember);
+}
+
+kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  margin: 0 1px;
+  font-family: var(--font-display);
+  font-size: 0.7em;
+  color: var(--ink);
+  background: var(--cream);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: 0 2px 0 var(--ink);
+}
+
+/* ---------- footer ---------- */
+
+.footer {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.footer__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--space-text);
+}
+
+@media (max-width: 560px) {
+  .footer {
+    display: none;
+  }
+
+  .screen {
+    padding: 18px 16px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

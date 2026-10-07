@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import type { Recording } from '../game/recording.js';
+import { missionsFor } from '../game/missions.js';
 import {
   DEFAULT_PROFILE,
+  chooseSkin,
+  missionProgress,
+  recordMissions,
+  unlockSkins,
   LEADERBOARD_SIZE,
   activeStreak,
   dailyToday,
@@ -181,6 +187,7 @@ describe('recordDaily', () => {
       bestTimeSeconds: 50,
       bestSector: 2,
       bestCombo: 7,
+      bestRun: null,
     });
     expect(profile.streak).toBe(1);
     expect(profile.runs).toBe(1);
@@ -228,6 +235,7 @@ describe('activeStreak', () => {
       bestTimeSeconds: 1,
       bestSector: 0,
       bestCombo: 0,
+      bestRun: null,
     },
     streak,
   });
@@ -257,6 +265,7 @@ describe('migrate daily data', () => {
       bestTimeSeconds: 4,
       bestSector: 0,
       bestCombo: 2,
+      bestRun: null,
     };
     expect(migrate({ version: 1, daily, streak: 3 }).daily).toEqual(daily);
     expect(migrate({ version: 1, daily, streak: 3 }).streak).toBe(3);
@@ -266,5 +275,79 @@ describe('migrate daily data', () => {
       daily: null,
       streak: 0,
     });
+  });
+});
+
+describe('the best daily run, kept as a ghost', () => {
+  const run = (ticks: number): Recording => ({
+    version: 1,
+    seed: 7,
+    scale: 1,
+    ticks,
+    data: 'AQA=',
+  });
+  const result = (score: number) => ({ score, timeSeconds: 1, sector: 0, bestCombo: 0 });
+
+  it('keeps the recording of the best attempt only', () => {
+    let profile = recordDaily(DEFAULT_PROFILE, '2026-10-08', result(500), run(1));
+    profile = recordDaily(profile, '2026-10-08', result(300), run(2));
+    expect(profile.daily?.bestRun?.ticks).toBe(1);
+    profile = recordDaily(profile, '2026-10-08', result(900), run(3));
+    expect(profile.daily?.bestRun?.ticks).toBe(3);
+  });
+
+  it('survives a save and load, and a corrupt one is dropped', () => {
+    const store = memoryStore();
+    saveProfile(recordDaily(DEFAULT_PROFILE, '2026-10-08', result(500), run(42)), store);
+    expect(loadProfile(store).daily?.bestRun?.ticks).toBe(42);
+
+    const daily = {
+      key: '2026-10-08',
+      attempts: 1,
+      best: 5,
+      bestTimeSeconds: 1,
+      bestSector: 0,
+      bestCombo: 0,
+      bestRun: { version: 1, seed: 'x' },
+    };
+    expect(migrate({ version: 1, daily }).daily?.bestRun).toBeNull();
+  });
+});
+
+describe('missions', () => {
+  const facts = { nearMisses: 3, bestCombo: 2, shards: 5, sector: 0, survivalTime: 12, pickups: 1 };
+
+  it("starts each day's progress from nothing and builds on it", () => {
+    expect(missionProgress(DEFAULT_PROFILE, '2026-10-08')).toEqual([]);
+    let profile = recordMissions(DEFAULT_PROFILE, '2026-10-08', facts);
+    expect(profile.missions?.progress).toHaveLength(missionsFor('2026-10-08').length);
+    const first = missionProgress(profile, '2026-10-08');
+    profile = recordMissions(profile, '2026-10-08', facts);
+    missionProgress(profile, '2026-10-08').forEach((value, i) =>
+      expect(value).toBeGreaterThanOrEqual(first[i] ?? 0),
+    );
+    expect(missionProgress(profile, '2026-10-09')).toEqual([]);
+  });
+});
+
+describe('ship finishes', () => {
+  it('can only be chosen once earned', () => {
+    expect(chooseSkin(DEFAULT_PROFILE, 'gold').skin).toBe('mint');
+    const owned = unlockSkins(DEFAULT_PROFILE, ['gold']);
+    expect(chooseSkin(owned, 'gold').skin).toBe('gold');
+    expect(unlockSkins(owned, ['gold']).unlocked).toEqual(['gold']);
+  });
+
+  it('falls back to the default if a saved choice is not owned or not real', () => {
+    expect(migrate({ version: 1, skin: 'gold', unlocked: [] }).skin).toBe('mint');
+    expect(migrate({ version: 1, skin: 'gold', unlocked: ['gold'] }).skin).toBe('gold');
+    expect(
+      migrate({ version: 1, skin: 'rainbow', unlocked: ['rainbow', 'gold', 'gold'] }),
+    ).toMatchObject({ skin: 'mint', unlocked: ['gold'] });
+  });
+
+  it('races the ghost unless the player turned it off', () => {
+    expect(migrate({ version: 1 }).ghost).toBe(true);
+    expect(migrate({ version: 1, ghost: false }).ghost).toBe(false);
   });
 });

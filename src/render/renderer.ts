@@ -10,6 +10,8 @@ import { Starfield } from './starfield.js';
 import { comboRemaining } from '../game/scoring.js';
 import { createRng } from '../core/rng.js';
 import { drawMeteor } from './meteors.js';
+import type { ShipLook } from './skins.js';
+import { SHIP_LOOKS } from './skins.js';
 
 /** What the frame is showing, beyond the world itself. */
 export interface Scene {
@@ -18,6 +20,8 @@ export interface Scene {
   readonly intensity: number;
   /** Which sector's colours the backdrop should be in. */
   readonly sector: number;
+  /** A replay racing alongside, drawn as a faint outline; `null` for none. */
+  readonly ghost: World | null;
 }
 
 export class Renderer {
@@ -25,6 +29,8 @@ export class Renderer {
   private readonly starfield: Starfield;
   private readonly backdrop = new Backdrop();
   readonly fx = new Effects();
+  /** The player's chosen ship finish. */
+  look: ShipLook = SHIP_LOOKS.mint;
   private time = 0;
   private effects = true;
 
@@ -94,6 +100,7 @@ export class Renderer {
     this.drawShards(ctx, world, alpha);
     this.drawPowerUps(ctx, world, alpha);
     this.drawAsteroids(ctx, world, alpha);
+    if (scene.ghost !== null) this.drawGhost(ctx, scene.ghost, alpha);
     if (scene.showShip) this.drawShip(ctx, world, alpha);
     this.drawParticles(ctx, world, alpha);
     this.fx.drawWorld(ctx);
@@ -383,17 +390,50 @@ export class Renderer {
     ctx.restore();
   }
 
+  /**
+   * The best attempt, flying its own run on the same field.
+   *
+   * Faint, flameless and outlined rather than filled, so in the corner of an
+   * eye it can never pass for the ship you are flying.
+   */
+  private drawGhost(ctx: CanvasRenderingContext2D, ghost: World, alpha: number): void {
+    const { ship } = ghost;
+    if (!ship.alive) return;
+    const r = ship.r;
+
+    ctx.save();
+    ctx.translate(lerp(ship.px, ship.x, alpha), lerp(ship.py, ship.y, alpha));
+    ctx.rotate(clamp(ship.vx / SHIP.maxSpeed, -1, 1) * 0.42);
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 1.35);
+    ctx.quadraticCurveTo(r * 0.72, -r * 0.1, r * 1.02, r * 0.72);
+    ctx.quadraticCurveTo(r * 0.4, r * 0.42, 0, r * 0.6);
+    ctx.quadraticCurveTo(-r * 0.4, r * 0.42, -r * 1.02, r * 0.72);
+    ctx.quadraticCurveTo(-r * 0.72, -r * 0.1, 0, -r * 1.35);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(244, 239, 230, 0.18)';
+    ctx.fill();
+    ctx.setLineDash([3, 3]);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = PALETTE.bone;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   private drawEngineFlame(ctx: CanvasRenderingContext2D, r: number): void {
     const flicker = 1 + Math.sin(this.time * 26) * 0.18;
     const length = r * 1.7 * flicker;
+    const { look } = this;
 
     const flame = ctx.createLinearGradient(0, r * 0.5, 0, r * 0.5 + length);
     flame.addColorStop(0, '#ffffff');
-    flame.addColorStop(0.35, PALETTE.shipGlow);
+    flame.addColorStop(0.35, look.flame);
     flame.addColorStop(1, 'transparent');
 
     if (this.effects) {
-      ctx.shadowColor = PALETTE.shipGlow;
+      ctx.shadowColor = look.glow;
       ctx.shadowBlur = r * 1.4;
     }
     ctx.fillStyle = flame;
@@ -407,16 +447,17 @@ export class Renderer {
   }
 
   private drawHull(ctx: CanvasRenderingContext2D, r: number): void {
+    const { look } = this;
     if (this.effects) {
-      ctx.shadowColor = PALETTE.shipGlow;
+      ctx.shadowColor = look.glow;
       ctx.shadowBlur = r * 1.6;
     }
 
     // Swept-back hull.
     const hull = ctx.createLinearGradient(0, -r * 1.3, 0, r);
-    hull.addColorStop(0, '#ffffff');
-    hull.addColorStop(0.45, PALETTE.ship);
-    hull.addColorStop(1, PALETTE.shipShade);
+    hull.addColorStop(0, look.hullLight);
+    hull.addColorStop(0.45, look.hullMid);
+    hull.addColorStop(1, look.hullShade);
 
     ctx.beginPath();
     ctx.moveTo(0, -r * 1.35);
@@ -430,18 +471,18 @@ export class Renderer {
     ctx.shadowBlur = 0;
 
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = PALETTE.shipOutline;
+    ctx.strokeStyle = look.outline;
     ctx.lineWidth = Math.max(1, r * 0.13);
     ctx.stroke();
 
     // Cockpit.
-    ctx.fillStyle = PALETTE.shipCockpit;
+    ctx.fillStyle = look.cockpit;
     ctx.beginPath();
     ctx.ellipse(0, -r * 0.34, r * 0.3, r * 0.44, 0, 0, TAU);
     ctx.fill();
 
     ctx.globalAlpha = 0.6;
-    ctx.fillStyle = '#e2fff7';
+    ctx.fillStyle = look.glint;
     ctx.beginPath();
     ctx.ellipse(-r * 0.09, -r * 0.46, r * 0.13, r * 0.2, -0.4, 0, TAU);
     ctx.fill();
@@ -487,11 +528,15 @@ export class Renderer {
     if (trail.length < 4) return;
 
     ctx.save();
-    ctx.strokeStyle = PALETTE.shipTrail;
+    const fixed = this.look.trail;
+    if (fixed !== null) ctx.strokeStyle = fixed;
     ctx.lineCap = 'round';
     const segments = trail.length / 2 - 1;
     for (let i = 0; i < segments; i += 1) {
       const t = i / segments;
+      // The aurora trail runs through the spectrum along its length.
+      if (fixed === null)
+        ctx.strokeStyle = `hsl(${String(Math.round(this.time * 90 + i * 22) % 360)} 90% 70%)`;
       ctx.globalAlpha = t * 0.5;
       ctx.lineWidth = SHIP.radius * 0.9 * t;
       ctx.beginPath();

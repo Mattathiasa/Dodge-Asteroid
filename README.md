@@ -38,6 +38,17 @@ Canvas 2D · zero runtime dependencies
   3,840 pts · ×11 combo · 3 tries
   ```
 
+- **Race your own best.** On a second daily attempt, a faint ghost flies your
+  best attempt of the day, on the same field, so you can see exactly where you
+  are ahead or behind. A run is recorded as the input fed to each tick, and
+  replays to the identical score; a test checks that in the real browser.
+- **Three daily missions**, the same for everyone because they come from the
+  day's seed: skim twelve rocks in one run, reach a ×6 combo, collect forty
+  shards today. Any run counts toward them.
+- **Ship finishes, earned by skill.** Reach Sector 3, hit a ×10 combo, finish a
+  day's missions. Purely cosmetic, and every hull stays in the ship's own colour
+  family, so nothing you fly can be mistaken for a hazard.
+
 - **Six sectors.** Every 25 seconds the field crosses into a new named sector:
   the nebula shifts colour, most rocks take that sector's colour family, and a
   banner says where you are. Past the sixth, the run cycles into "Deep" sectors.
@@ -157,7 +168,7 @@ intensity)` decides the arrangement and is unit-tested; a small scheduler
 ## Testing
 
 The simulation is a pure function of its seed, its input and its timestep, and
-that is what the tests cover: **230 unit tests** across the difficulty curve,
+that is what the tests cover: **253 unit tests** across the difficulty curve,
 collision (including the tunnelling case), scoring and near-miss timing, comets
 and their warnings, shards and their pull, sectors, spawning, the state machine,
 the loop, the object pool, persistence, the music arrangement, and a
@@ -170,8 +181,9 @@ real built game** in Chromium and on an emulated phone: that the ship follows
 the mouse and the keyboard, that pausing genuinely freezes the world, that a
 crash plays out before a run ends on an in-page screen that explains the score,
 that the best score and the sound and music settings survive a reload, that a
-daily run is the same seed on every attempt and its result can be shared, and
-that a tap steers on a touch screen.
+daily run is the same seed on every attempt and its result can be shared, that
+the run the game recorded replays to the score it actually got, and that a tap
+steers on a touch screen.
 
 ```bash
 npm run typecheck   # tsc --noEmit
@@ -244,7 +256,7 @@ to avoid:
 | The ship rendered a full body-width away from the cursor                                                                                                                       | One tested coordinate mapping                                       |
 | Mouse only, with no viewport meta tag, so it could not be played on a phone                                                                                                    | Mouse, touch and keyboard                                           |
 | 86 KB of vendored jQuery carrying three CVEs                                                                                                                                   | No runtime dependencies                                             |
-| No tests, no CI, no licence                                                                                                                                                    | 230 unit tests, 19 e2e specs, CI on every push                      |
+| No tests, no CI, no licence                                                                                                                                                    | 253 unit tests, 23 e2e specs, CI on every push                      |
 
 ## Licence
 

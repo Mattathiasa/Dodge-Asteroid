@@ -4,7 +4,7 @@ import type { DifficultyMode } from './game/modes.js';
 import type { MusicMode } from './audio/music.js';
 import type { Profile } from './storage/storage.js';
 import type { Scene } from './render/renderer.js';
-import type { SimEvent } from './game/events.js';
+import type { SimEvent, SimEventSink } from './game/events.js';
 import type { Phase } from './game/phase.js';
 
 import { CAMERA, FEEL, PALETTE, POWERUPS, WORLD } from './config.js';
@@ -26,7 +26,11 @@ import { createWorld, resetRun } from './game/world.js';
 import { intensityAt } from './game/difficulty.js';
 import {
   activeStreak,
+  chooseSkin,
   dailyToday,
+  missionProgress,
+  recordMissions,
+  unlockSkins,
   loadProfile,
   recordDaily,
   recordRun,
@@ -35,6 +39,15 @@ import {
 import { createAnalytics } from './analytics/analytics.js';
 import { dailyKey, dailyNumber, dailySeed } from './core/daily.js';
 import { shareText } from './game/share.js';
+import type { RunFacts } from './game/missions.js';
+import type { SkinId } from './game/unlocks.js';
+import type { World } from './game/world.js';
+import { Playback, Recorder, replay as replayRecording, worldFor } from './game/recording.js';
+import { SHIP_LOOKS } from './render/skins.js';
+import { SKINS, newlyUnlocked } from './game/unlocks.js';
+import { allDone, missionsFor } from './game/missions.js';
+import { renderHangar } from './ui/hangar.js';
+import { renderMissions } from './ui/missions.js';
 import { renderLeaderboard } from './ui/leaderboard.js';
 import { renderRunStats } from './ui/summary.js';
 import { updateAttract } from './game/attract.js';
@@ -60,6 +73,8 @@ const MENU_SECTOR_SECONDS = 7;
 export interface DebugSnapshot {
   phase: Phase;
   mode: RunMode;
+  /** Whether a ghost is racing this run. */
+  ghost: boolean;
   score: number;
   elapsed: number;
   lives: number;
@@ -71,9 +86,15 @@ export interface DebugSnapshot {
   nearMisses: number;
 }
 
+/** Today's best daily score as stored, and as its recording replays. */
+export interface ReplayCheck {
+  stored: number;
+  replayed: number;
+}
+
 declare global {
   interface Window {
-    __dodge?: { snapshot(): DebugSnapshot };
+    __dodge?: { snapshot(): DebugSnapshot; verifyBest(): ReplayCheck | null };
   }
 }
 
@@ -103,6 +124,10 @@ function start(): void {
   /** The day a daily run belongs to, fixed when it starts. */
   let runKey = dailyKey(new Date());
   let shareTimer: number | undefined;
+  /** Records the run in progress, so the best daily attempt can fly again. */
+  let recorder: Recorder | null = null;
+  /** Today's best daily attempt, replaying alongside this one. */
+  let ghost: { world: World; playback: Playback } | null = null;
   let reducedMotion = profile.reducedMotion ?? prefersReducedMotion();
   /** Seconds the simulation is frozen for, after an impact. */
   let hitStop = 0;
@@ -116,6 +141,8 @@ function start(): void {
   const camera = createCamera();
   const shakeRng = createRng(0x51a2e);
   const events = createEventBuffer();
+  /** The ghost makes no sound and shakes nothing, so its events go nowhere. */
+  const ghostEvents: SimEventSink = { emit: () => undefined };
   const audio = createAudioEngine();
   const input = new InputManager(canvas);
   const renderer = new Renderer(canvas, 0xbeef);
@@ -154,6 +181,11 @@ function start(): void {
   const dailyMeta = must<HTMLElement>('daily-meta');
   const dailyResult = must<HTMLElement>('daily-result');
   const shareStatus = must<HTMLElement>('share-status');
+  const hudBestLabel = must<HTMLElement>('hud-best-label');
+  const unlockNote = must<HTMLElement>('unlock-note');
+  const menuMissions = must<HTMLElement>('menu-missions');
+  const gameoverMissions = must<HTMLElement>('gameover-missions');
+  const hangar = must<HTMLElement>('hangar');
 
   // ---- viewport ----
   let viewport = computeViewport(
@@ -215,12 +247,14 @@ function start(): void {
         showShip: false,
         intensity: 0.15,
         sector: Math.floor(menuTime / MENU_SECTOR_SECONDS) % SECTOR_TABLE.length,
+        ghost: null,
       };
     }
     return {
       showShip: true,
       intensity: intensityAt(world.fieldTime * world.difficultyScale),
       sector: world.sector,
+      ghost: ghost !== null && (phase === 'playing' || phase === 'paused') ? ghost.world : null,
     };
   };
 
@@ -236,8 +270,8 @@ function start(): void {
   function beginRun(): void {
     // A daily run is always on today's seed at normal difficulty, so every
     // score on the same day is a score on the same field.
+    runKey = dailyKey(new Date());
     if (runMode === 'daily') {
-      runKey = dailyKey(new Date());
       resetRun(world, dailySeed(runKey));
       world.difficultyScale = DIFFICULTY_SCALES.normal;
       hudMode.textContent = `Daily #${String(dailyNumber(runKey))}`;
@@ -246,6 +280,15 @@ function start(): void {
       world.difficultyScale = DIFFICULTY_SCALES[difficulty];
     }
     hudMode.hidden = runMode !== 'daily';
+    recorder = new Recorder(world.seed, world.difficultyScale);
+
+    // Race today's best attempt, if there is one: same seed, same field.
+    const best = runMode === 'daily' && profile.ghost ? dailyToday(profile, runKey)?.bestRun : null;
+    ghost =
+      best !== null && best !== undefined && best.seed === world.seed
+        ? { world: worldFor(best), playback: new Playback(best) }
+        : null;
+    hudBestLabel.textContent = ghost === null ? 'Best' : 'Ghost';
     analytics.track(`run/start/${runMode}`);
     world.countdown = COUNTDOWN_SECONDS;
     camera.trauma = 0;
@@ -260,13 +303,17 @@ function start(): void {
 
   /** The best the current run is measured against: today's, for a daily. */
   function currentBest(): number {
+    if (ghost !== null && phase !== 'menu') return ghost.world.score.points;
     if (runMode === 'daily' && phase !== 'menu') return dailyToday(profile, runKey)?.best ?? 0;
     return profile.bestScore;
   }
 
   function finishRun(): void {
-    if (runMode === 'daily') finishDaily();
+    const recording = recorder?.finish() ?? null;
+    recorder = null;
+    if (runMode === 'daily') finishDaily(recording);
     else finishEndless();
+    finishMissions();
 
     const { score } = world;
     countUp(must<HTMLElement>('final-score'), score.points);
@@ -286,15 +333,54 @@ function start(): void {
     analytics.track(`run/end/${runMode}/sector-${String(Math.min(world.sector + 1, 7))}`);
   }
 
-  function finishDaily(): void {
+  /** Folds the run into today's missions, and hands out anything it earned. */
+  function finishMissions(): void {
+    const { score } = world;
+    const facts: RunFacts = {
+      nearMisses: score.nearMisses,
+      bestCombo: score.bestCombo,
+      shards: score.shards,
+      sector: world.sector,
+      survivalTime: score.survivalTime,
+      pickups: score.pickups,
+    };
+    const missions = missionsFor(runKey);
+    const wasDone = allDone(missions, missionProgress(profile, runKey));
+    profile = recordMissions(profile, runKey, facts);
+    const progress = missionProgress(profile, runKey);
+    const nowDone = allDone(missions, progress);
+
+    const earned = newlyUnlocked(profile.unlocked, facts, nowDone);
+    profile = unlockSkins(profile, earned);
+    persist();
+
+    renderMissions(gameoverMissions, missions, progress);
+    if (nowDone && !wasDone) analytics.track('missions/complete');
+
+    unlockNote.hidden = earned.length === 0;
+    if (earned.length > 0) {
+      const names = earned.map((id) => SKINS.find((skin) => skin.id === id)?.name ?? id);
+      unlockNote.textContent = `New ship finish: ${names.join(', ')}. Choose it in Settings.`;
+      announcer.say(unlockNote.textContent);
+      for (const id of earned) analytics.track(`unlock/${id}`);
+      renderShipPicker();
+    }
+  }
+
+  function finishDaily(recording: ReturnType<Recorder['finish']> | null): void {
     const { score } = world;
     const before = dailyToday(profile, runKey)?.best ?? 0;
-    profile = recordDaily(profile, runKey, {
-      score: score.points,
-      timeSeconds: score.survivalTime,
-      sector: world.sector,
-      bestCombo: score.bestCombo,
-    });
+    profile = recordDaily(
+      profile,
+      runKey,
+      {
+        score: score.points,
+        timeSeconds: score.survivalTime,
+        sector: world.sector,
+        bestCombo: score.bestCombo,
+      },
+      recording,
+    );
     persist();
 
     const today = dailyToday(profile, runKey);
@@ -543,13 +629,17 @@ function start(): void {
 
       // The explosion plays out in slow motion before the run-over screen.
       const scale = phase === 'dying' ? FEEL.deathTimeScale : 1;
-      const alive = update(
-        world,
-        dt * scale,
-        { steer: snapshot, canSteer: acceptsSteering(phase) },
-        events,
-      );
+      const live = { steer: snapshot, canSteer: acceptsSteering(phase) };
+      // While playing, the simulation is fed exactly what is recorded, which
+      // is what lets the recording replay the run tick for tick.
+      const fed = phase === 'playing' && recorder !== null ? recorder.record(live) : live;
+      const alive = update(world, dt * scale, fed, events);
       for (const event of events.drain()) handleSimEvent(event);
+
+      if (phase === 'playing' && ghost !== null) {
+        const next = ghost.playback.next();
+        if (next !== null) update(ghost.world, dt, next, ghostEvents);
+      }
 
       if (phase === 'playing' && !alive) {
         dyingFor = 0;
@@ -591,7 +681,8 @@ function start(): void {
       row.append(dt, dd);
       stats.append(row);
     }
-    renderLeaderboard(must('menu-leaderboard'), profile.leaderboard, { limit: 3 });
+    const today = dailyKey(new Date());
+    renderMissions(menuMissions, missionsFor(today), missionProgress(profile, today));
     refreshDailyCard();
   }
 
@@ -678,6 +769,15 @@ function start(): void {
   const reducedMotionToggle = must<HTMLInputElement>('reduced-motion-toggle');
   const soundToggle = must<HTMLInputElement>('sound-toggle');
   const musicToggle = must<HTMLInputElement>('music-toggle');
+  const ghostToggle = must<HTMLInputElement>('ghost-toggle');
+
+  function renderShipPicker(): void {
+    renderHangar(hangar, profile.unlocked, profile.skin, (id: SkinId) => {
+      profile = chooseSkin(profile, id);
+      renderer.look = SHIP_LOOKS[profile.skin];
+      persist();
+    });
+  }
 
   const startRun = (next: RunMode): void => {
     runMode = next;
@@ -727,6 +827,11 @@ function start(): void {
     persist();
   });
 
+  ghostToggle.addEventListener('change', () => {
+    profile = { ...profile, ghost: ghostToggle.checked };
+    persist();
+  });
+
   // Pause when the tab is hidden. Without this the loop tries to catch up on
   // every second the player was away and kills them the moment they return.
   document.addEventListener('visibilitychange', () => {
@@ -746,6 +851,7 @@ function start(): void {
     snapshot: (): DebugSnapshot => ({
       phase,
       mode: runMode,
+      ghost: ghost !== null,
       score: world.score.points,
       elapsed: world.elapsed,
       lives: world.ship.lives,
@@ -756,6 +862,13 @@ function start(): void {
       shards: world.score.shards,
       nearMisses: world.score.nearMisses,
     }),
+    // Replays today's stored best through the simulation, entirely apart from
+    // the game. If what the loop recorded is what it fed, this matches.
+    verifyBest: (): ReplayCheck | null => {
+      const today = dailyToday(profile, dailyKey(new Date()));
+      if (today?.bestRun === null || today === null) return null;
+      return { stored: today.best, replayed: replayRecording(today.bestRun).score.points };
+    },
   };
 
   // ---- go ----
@@ -765,6 +878,9 @@ function start(): void {
   applyMotionPreference();
   applyMute();
   applyMusic();
+  ghostToggle.checked = profile.ghost;
+  renderer.look = SHIP_LOOKS[profile.skin];
+  renderShipPicker();
   audio.setMusicMode('calm');
   refreshMenuStats();
   hud.update(world, profile.bestScore);

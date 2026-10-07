@@ -4,6 +4,7 @@ import { expect, test } from '@playwright/test';
 interface DebugSnapshot {
   phase: string;
   mode: string;
+  ghost: boolean;
   score: number;
   elapsed: number;
   lives: number;
@@ -314,6 +315,58 @@ test.describe('daily run', () => {
     await page.getByRole('button', { name: 'Main menu' }).click();
     await expect(page.locator('#daily-meta')).toContainText('1 try');
     await expect(page.locator('#daily-meta')).toContainText('1-day streak');
+  });
+});
+
+test.describe('ghost, missions and ship finishes', () => {
+  test('replays the best daily attempt exactly, and races it next time', async ({ page }) => {
+    await startDaily(page);
+    expect((await snapshot(page)).ghost).toBe(false);
+    await crashTheShip(page);
+
+    // What the loop recorded must replay to the score the run actually got.
+    const check = await page.evaluate(() => window.__dodge?.verifyBest() ?? null);
+    expect(check).not.toBeNull();
+    expect(check?.replayed).toBe(check?.stored);
+
+    await page.getByRole('button', { name: 'Play again' }).click();
+    await expect
+      .poll(async () => (await snapshot(page)).phase, { timeout: 15_000 })
+      .toBe('playing');
+    expect((await snapshot(page)).ghost).toBe(true);
+    await expect(page.locator('#hud-best-label')).toHaveText('Ghost');
+  });
+
+  test('can race without the ghost', async ({ page }) => {
+    await startDaily(page);
+    await crashTheShip(page);
+    await page.getByRole('button', { name: 'Main menu' }).click();
+
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByLabel('Race a ghost of your best daily attempt').uncheck();
+    await page.getByRole('button', { name: 'Back' }).click();
+
+    await startDaily(page);
+    expect((await snapshot(page)).ghost).toBe(false);
+    await expect(page.locator('#hud-best-label')).toHaveText('Best');
+  });
+
+  test("shows today's three missions, and counts a run toward them", async ({ page }) => {
+    const missions = page.locator('#menu-missions li');
+    await expect(missions).toHaveCount(3);
+    await expect(missions.first()).toContainText(/\d/);
+
+    await startRun(page);
+    await crashTheShip(page);
+    await expect(page.locator('#gameover-missions li')).toHaveCount(3);
+  });
+
+  test('offers only earned ship finishes, and says how to earn the rest', async ({ page }) => {
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByRole('radio', { name: 'Mint' })).toBeChecked();
+    const abyss = page.getByRole('radio', { name: /Abyss/ });
+    await expect(abyss).toBeDisabled();
+    await expect(page.locator('.hangar__option.is-locked').first()).toContainText('Reach Sector 3');
   });
 });
 

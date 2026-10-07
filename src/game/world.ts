@@ -114,6 +114,7 @@ export function resetRun(world: World, seed: number): void {
   score.nearMisses = 0;
   score.bestCombo = 0;
   score.shards = 0;
+  score.pickups = 0;
 
   world.rng = createRng(seed);
   world.fxRng = createRng(fxSeed(seed));

@@ -1,5 +1,11 @@
 import { STORAGE_KEY } from '../config.js';
+import type { Recording } from '../game/recording.js';
+import type { RunFacts } from '../game/missions.js';
+import type { SkinId } from '../game/unlocks.js';
+import { DEFAULT_SKIN, isSkinId } from '../game/unlocks.js';
+import { advance, missionsFor } from '../game/missions.js';
 import { isDailyKey, previousKey } from '../core/daily.js';
+import { isRecording } from '../game/recording.js';
 
 export interface ScoreEntry {
   readonly score: number;
@@ -17,6 +23,14 @@ export interface DailyRecord {
   readonly bestTimeSeconds: number;
   readonly bestSector: number;
   readonly bestCombo: number;
+  /** The best attempt itself, so it can fly again as a ghost. */
+  readonly bestRun: Recording | null;
+}
+
+/** Progress on one day's missions, in the order `missionsFor` gives them. */
+export interface MissionProgress {
+  readonly key: string;
+  readonly progress: readonly number[];
 }
 
 export interface Profile {
@@ -34,6 +48,13 @@ export interface Profile {
   readonly daily: DailyRecord | null;
   /** Consecutive days with at least one daily run, ending on `daily.key`. */
   readonly streak: number;
+  /** Progress on the most recent day's missions, or `null` before any. */
+  readonly missions: MissionProgress | null;
+  /** Ship finishes earned, beyond the one everyone starts with. */
+  readonly unlocked: readonly SkinId[];
+  readonly skin: SkinId;
+  /** Whether a daily run races a ghost of the day's best attempt. */
+  readonly ghost: boolean;
 }
 
 export const LEADERBOARD_SIZE = 10;
@@ -49,6 +70,10 @@ export const DEFAULT_PROFILE: Profile = {
   leaderboard: [],
   daily: null,
   streak: 0,
+  missions: null,
+  unlocked: [],
+  skin: DEFAULT_SKIN,
+  ghost: true,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -85,7 +110,20 @@ function toDaily(value: unknown): DailyRecord | null {
     bestTimeSeconds: typeof time === 'number' && Number.isFinite(time) ? Math.max(0, time) : 0,
     bestSector: toCount(value['bestSector']),
     bestCombo: toCount(value['bestCombo']),
+    bestRun: isRecording(value['bestRun']) ? value['bestRun'] : null,
   };
+}
+
+function toMissions(value: unknown): MissionProgress | null {
+  if (!isRecord(value) || !isDailyKey(value['key'])) return null;
+  const raw = value['progress'];
+  if (!Array.isArray(raw)) return null;
+  return { key: value['key'], progress: raw.slice(0, 8).map((n) => toCount(n)) };
+}
+
+function toUnlocked(value: unknown): SkinId[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(isSkinId))].filter((id) => id !== DEFAULT_SKIN);
 }
 
 /**
@@ -100,6 +138,8 @@ export function migrate(raw: unknown): Profile {
   if (raw['version'] !== 1) return DEFAULT_PROFILE;
 
   const reducedMotion = raw['reducedMotion'];
+  const unlocked = toUnlocked(raw['unlocked']);
+  const skin = raw['skin'];
   return {
     version: 1,
     bestScore: toCount(raw['bestScore']),
@@ -115,6 +155,12 @@ export function migrate(raw: unknown): Profile {
     leaderboard: toEntries(raw['leaderboard']),
     daily: toDaily(raw['daily']),
     streak: toCount(raw['streak']),
+    missions: toMissions(raw['missions']),
+    unlocked,
+    // A chosen finish that is no longer owned falls back to the default.
+    skin:
+      isSkinId(skin) && (skin === DEFAULT_SKIN || unlocked.includes(skin)) ? skin : DEFAULT_SKIN,
+    ghost: raw['ghost'] !== false,
   };
 }
 
@@ -193,7 +239,12 @@ export interface DailyResult {
  * the same difficulty on a field everyone shares, so mixing them in would make
  * both lists mean less. They do count as runs played.
  */
-export function recordDaily(profile: Profile, key: string, result: DailyResult): Profile {
+export function recordDaily(
+  profile: Profile,
+  key: string,
+  result: DailyResult,
+  run: Recording | null = null,
+): Profile {
   const today = profile.daily?.key === key ? profile.daily : null;
   const improved = today === null || result.score > today.best;
 
@@ -204,6 +255,7 @@ export function recordDaily(profile: Profile, key: string, result: DailyResult):
     bestTimeSeconds: improved ? result.timeSeconds : today.bestTimeSeconds,
     bestSector: improved ? result.sector : today.bestSector,
     bestCombo: improved ? result.bestCombo : today.bestCombo,
+    bestRun: improved ? run : today.bestRun,
   };
 
   return {
@@ -234,4 +286,26 @@ export function activeStreak(profile: Profile, todayKey: string): number {
 /** Today's daily record, or `null` if the player has not run today's yet. */
 export function dailyToday(profile: Profile, todayKey: string): DailyRecord | null {
   return profile.daily?.key === todayKey ? profile.daily : null;
+}
+
+/** Today's mission progress, starting fresh on a new day. */
+export function missionProgress(profile: Profile, todayKey: string): readonly number[] {
+  return profile.missions?.key === todayKey ? profile.missions.progress : [];
+}
+
+/** Folds a run, of either kind, into the day's missions. */
+export function recordMissions(profile: Profile, todayKey: string, facts: RunFacts): Profile {
+  const progress = advance(missionsFor(todayKey), missionProgress(profile, todayKey), facts);
+  return { ...profile, missions: { key: todayKey, progress } };
+}
+
+export function unlockSkins(profile: Profile, ids: readonly SkinId[]): Profile {
+  if (ids.length === 0) return profile;
+  return { ...profile, unlocked: [...new Set([...profile.unlocked, ...ids])] };
+}
+
+/** Chooses a finish, if it has been earned. */
+export function chooseSkin(profile: Profile, id: SkinId): Profile {
+  if (id !== DEFAULT_SKIN && !profile.unlocked.includes(id)) return profile;
+  return { ...profile, skin: id };
 }

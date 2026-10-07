@@ -50,6 +50,7 @@ export function initAsteroid(a: Asteroid, spec: AsteroidSpec): void {
   a.nearMissed = false;
   a.comet = spec.comet;
   a.warn = spec.warn;
+  a.ghost = false;
 }
 
 /** Whether a spawn is due, respecting the active-count pressure valve. */

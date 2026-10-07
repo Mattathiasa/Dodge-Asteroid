@@ -1,10 +1,22 @@
 import { STORAGE_KEY } from '../config.js';
+import { isDailyKey, previousKey } from '../core/daily.js';
 
 export interface ScoreEntry {
   readonly score: number;
   readonly timeSeconds: number;
   /** Epoch milliseconds. */
   readonly at: number;
+}
+
+/** The player's results for one daily run. */
+export interface DailyRecord {
+  readonly key: string;
+  readonly attempts: number;
+  /** The best attempt's figures, which are what gets shared. */
+  readonly best: number;
+  readonly bestTimeSeconds: number;
+  readonly bestSector: number;
+  readonly bestCombo: number;
 }
 
 export interface Profile {
@@ -18,6 +30,10 @@ export interface Profile {
   /** `null` follows the operating system setting. */
   readonly reducedMotion: boolean | null;
   readonly leaderboard: readonly ScoreEntry[];
+  /** The most recent day the player ran the daily, or `null` if never. */
+  readonly daily: DailyRecord | null;
+  /** Consecutive days with at least one daily run, ending on `daily.key`. */
+  readonly streak: number;
 }
 
 export const LEADERBOARD_SIZE = 10;
@@ -31,6 +47,8 @@ export const DEFAULT_PROFILE: Profile = {
   music: true,
   reducedMotion: null,
   leaderboard: [],
+  daily: null,
+  streak: 0,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -53,6 +71,21 @@ function toEntries(value: unknown): ScoreEntry[] {
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, LEADERBOARD_SIZE);
+}
+
+function toDaily(value: unknown): DailyRecord | null {
+  if (!isRecord(value) || !isDailyKey(value['key'])) return null;
+  const attempts = toCount(value['attempts']);
+  if (attempts === 0) return null;
+  const time = value['bestTimeSeconds'];
+  return {
+    key: value['key'],
+    attempts,
+    best: toCount(value['best']),
+    bestTimeSeconds: typeof time === 'number' && Number.isFinite(time) ? Math.max(0, time) : 0,
+    bestSector: toCount(value['bestSector']),
+    bestCombo: toCount(value['bestCombo']),
+  };
 }
 
 /**
@@ -80,6 +113,8 @@ export function migrate(raw: unknown): Profile {
     music: raw['music'] !== false,
     reducedMotion: typeof reducedMotion === 'boolean' ? reducedMotion : null,
     leaderboard: toEntries(raw['leaderboard']),
+    daily: toDaily(raw['daily']),
+    streak: toCount(raw['streak']),
   };
 }
 
@@ -142,4 +177,61 @@ export function recordRun(
     bestTimeSeconds: Math.max(profile.bestTimeSeconds, timeSeconds),
     leaderboard,
   };
+}
+
+export interface DailyResult {
+  readonly score: number;
+  readonly timeSeconds: number;
+  readonly sector: number;
+  readonly bestCombo: number;
+}
+
+/**
+ * Folds a finished daily attempt into the profile.
+ *
+ * Daily runs are kept apart from the endless board: they are always played at
+ * the same difficulty on a field everyone shares, so mixing them in would make
+ * both lists mean less. They do count as runs played.
+ */
+export function recordDaily(profile: Profile, key: string, result: DailyResult): Profile {
+  const today = profile.daily?.key === key ? profile.daily : null;
+  const improved = today === null || result.score > today.best;
+
+  const daily: DailyRecord = {
+    key,
+    attempts: (today?.attempts ?? 0) + 1,
+    best: improved ? result.score : today.best,
+    bestTimeSeconds: improved ? result.timeSeconds : today.bestTimeSeconds,
+    bestSector: improved ? result.sector : today.bestSector,
+    bestCombo: improved ? result.bestCombo : today.bestCombo,
+  };
+
+  return {
+    ...profile,
+    runs: profile.runs + 1,
+    daily,
+    streak: nextStreak(profile, key),
+  };
+}
+
+function nextStreak(profile: Profile, key: string): number {
+  const last = profile.daily?.key;
+  if (last === key) return Math.max(1, profile.streak);
+  if (last !== undefined && last === previousKey(key)) return profile.streak + 1;
+  return 1;
+}
+
+/**
+ * The streak as it stands today: still alive if the last daily was today or
+ * yesterday, and broken, so zero, if a day was missed.
+ */
+export function activeStreak(profile: Profile, todayKey: string): number {
+  const last = profile.daily?.key;
+  if (last === todayKey || last === previousKey(todayKey)) return profile.streak;
+  return 0;
+}
+
+/** Today's daily record, or `null` if the player has not run today's yet. */
+export function dailyToday(profile: Profile, todayKey: string): DailyRecord | null {
+  return profile.daily?.key === todayKey ? profile.daily : null;
 }

@@ -5,6 +5,7 @@ declare global {
     __dodge?: {
       snapshot(): {
         phase: string;
+        mode: string;
         score: number;
         elapsed: number;
         lives: number;

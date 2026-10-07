@@ -30,8 +30,15 @@ export interface World {
   seed: number;
   /** Seconds of simulated time since the run began. */
   elapsed: number;
-  /** Simulated milliseconds, used for spawn and combo deadlines. */
+  /** Simulated milliseconds, used for combo and chain deadlines. */
   clockMs: number;
+  /**
+   * Seconds of *field* time: the clock spawns, difficulty and sectors run on.
+   * Slow-mo slows it along with everything that moves, so collecting slow-mo
+   * dilates the field instead of compressing the next minute of it.
+   */
+  fieldTime: number;
+  fieldMs: number;
   nextSpawnAtMs: number;
   nextShardAtMs: number;
   /** Current sector index; see `sectorAt`. */
@@ -61,6 +68,8 @@ export function createWorld(seed: number): World {
     seed,
     elapsed: 0,
     clockMs: 0,
+    fieldTime: 0,
+    fieldMs: 0,
     nextSpawnAtMs: 0,
     nextShardAtMs: 0,
     sector: 0,
@@ -111,6 +120,8 @@ export function resetRun(world: World, seed: number): void {
   world.seed = seed;
   world.elapsed = 0;
   world.clockMs = 0;
+  world.fieldTime = 0;
+  world.fieldMs = 0;
   world.nextSpawnAtMs = 0;
   world.nextShardAtMs = 0;
   world.sector = 0;

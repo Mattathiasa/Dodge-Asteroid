@@ -1,4 +1,4 @@
-import { DIFFICULTY } from '../config.js';
+import { COMETS, DIFFICULTY } from '../config.js';
 import { clamp01, smoothstep } from '../core/math.js';
 
 export interface DifficultyParams {
@@ -12,6 +12,9 @@ export interface DifficultyParams {
   readonly driftX: number;
   readonly maxActive: number;
   readonly powerUpChance: number;
+  /** Probability a spawn is a telegraphed comet. Zero early in a run. */
+  readonly cometChance: number;
+  readonly shardIntervalMs: number;
 }
 
 interface Range {
@@ -54,5 +57,7 @@ export function difficultyAt(elapsedSeconds: number): DifficultyParams {
     driftX: ramp(DIFFICULTY.driftX, intensity),
     maxActive: Math.round(ramp(DIFFICULTY.maxActive, intensity)),
     powerUpChance: ramp(DIFFICULTY.powerUpChance, intensity),
+    cometChance: intensity < COMETS.minIntensity ? 0 : ramp(DIFFICULTY.cometChance, intensity),
+    shardIntervalMs: ramp(DIFFICULTY.shardIntervalMs, intensity),
   };
 }

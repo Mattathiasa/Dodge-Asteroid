@@ -7,18 +7,27 @@
     <title>Dodge Asteroid</title>
     <meta
       name="description"
-      content="A neon arcade dodging game built with TypeScript and Canvas 2D. Survive the asteroid field with mouse, touch or keyboard."
+      content="A sticker-arcade dodging game built with TypeScript and Canvas 2D. Thread near misses, chase star shards and outrun telegraphed comets through six sectors."
     />
-    <meta name="theme-color" content="#0a0620" />
+    <meta name="theme-color" content="#04141c" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Dodge Asteroid" />
     <meta
       property="og:description"
-      content="A neon arcade dodging game built with TypeScript and Canvas 2D."
+      content="A sticker-arcade dodging game: skim rocks for combos, chase star shards and outrun telegraphed comets through six sectors. Plays in the browser on desktop or phone."
     />
     <meta property="og:url" content="https://mattathiasa.github.io/Dodge-Asteroid/" />
+    <!-- Crawlers need an absolute URL here; the image is built by npm run media. -->
+    <meta property="og:image" content="https://mattathiasa.github.io/Dodge-Asteroid/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Dodge Asteroid: a mint ship weaving between glowing rocks on a deep teal field"
+    />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://mattathiasa.github.io/Dodge-Asteroid/og.jpg" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -29,7 +38,7 @@
 
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23080a1f'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%234ff0ff'/%3E%3Ccircle cx='10' cy='8' r='3.4' fill='%23ff4fa3'/%3E%3Ccircle cx='23' cy='11' r='2.6' fill='%23ff4fa3'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2304141c'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%237dffd8'/%3E%3Ccircle cx='10' cy='8' r='3.4' fill='%23ff6b4a'/%3E%3Ccircle cx='23' cy='11' r='2.6' fill='%23ff6b4a'/%3E%3C/svg%3E"
     />
   </head>
 
@@ -81,6 +90,7 @@
               </button>
 
               <div class="home-actions">
+                <button class="pill" id="guide-button" type="button">How to play</button>
                 <button class="pill" id="settings-button" type="button">Settings</button>
                 <button class="pill" id="about-button" type="button">About</button>
               </div>
@@ -112,6 +122,7 @@
                 <span class="screen__meta" id="final-meta"></span>
               </p>
               <p class="screen__best" id="best-banner" hidden>New personal best</p>
+              <dl class="run-stats" id="run-stats"></dl>
               <div class="screen__actions">
                 <button class="cta cta--compact" id="again-button" type="button" data-autofocus>
                   <span class="cta__label">Play again</span>
@@ -140,6 +151,10 @@
                   <input type="checkbox" id="sound-toggle" checked />
                   <span class="field__label">Sound effects</span>
                 </label>
+                <label class="field field--switch">
+                  <input type="checkbox" id="music-toggle" checked />
+                  <span class="field__label">Music</span>
+                </label>
               </div>
               <div class="screen__actions">
                 <button
@@ -153,19 +168,164 @@
               </div>
             </section>
 
+            <section class="screen" id="screen-guide" aria-labelledby="guide-heading" hidden>
+              <h2 class="screen__title" id="guide-heading">How to play</h2>
+              <p class="screen__lede">
+                Stay alive. Everything below is how you score while you do it.
+              </p>
+              <ul class="guide">
+                <li class="guide__item">
+                  <svg class="guide__icon" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle
+                      cx="20"
+                      cy="20"
+                      r="15"
+                      fill="none"
+                      stroke="#ffc94a"
+                      stroke-opacity=".3"
+                      stroke-width="3.5"
+                    />
+                    <path
+                      d="M20 5 A15 15 0 1 1 7 27.5"
+                      fill="none"
+                      stroke="#ffc94a"
+                      stroke-width="3.5"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      d="M20 12 L25 25 L20 23 L15 25 Z"
+                      fill="#7dffd8"
+                      stroke="#0b1f26"
+                      stroke-width="1.6"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <p>
+                    <strong>Near misses build your combo.</strong> Skim a rock without touching it.
+                    The ring round your ship is the time left to land the next one.
+                  </p>
+                </li>
+                <li class="guide__item">
+                  <svg class="guide__icon" viewBox="0 0 40 40" aria-hidden="true">
+                    <path
+                      d="M20 5 L30 20 L20 35 L10 20 Z"
+                      fill="#ffe7a3"
+                      stroke="#0b1f26"
+                      stroke-width="2.2"
+                      stroke-linejoin="round"
+                    />
+                    <path d="M20 5 L30 20 L20 35 Z" fill="#7a3a00" fill-opacity=".22" />
+                  </svg>
+                  <p>
+                    <strong>Star shards are points.</strong> Fly through them; they are pulled in
+                    when you are close, and your combo multiplies them.
+                  </p>
+                </li>
+                <li class="guide__item">
+                  <svg class="guide__icon" viewBox="0 0 40 40" aria-hidden="true">
+                    <rect
+                      x="11"
+                      y="2"
+                      width="18"
+                      height="36"
+                      rx="2"
+                      fill="#ff3d6e"
+                      fill-opacity=".22"
+                    />
+                    <path
+                      d="M20 8 L31 28 L9 28 Z"
+                      fill="#ff3d6e"
+                      stroke="#0b1f26"
+                      stroke-width="2.4"
+                      stroke-linejoin="round"
+                    />
+                    <rect x="18.6" y="14" width="2.8" height="7.5" rx="1.2" fill="#f4efe6" />
+                    <circle cx="20" cy="24.6" r="1.6" fill="#f4efe6" />
+                  </svg>
+                  <p>
+                    <strong>A red lane means a comet.</strong> It falls straight down that lane a
+                    moment later, fast. Get out of it.
+                  </p>
+                </li>
+                <li class="guide__item">
+                  <svg class="guide__icon" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle
+                      cx="20"
+                      cy="20"
+                      r="13"
+                      fill="#7cc8ff"
+                      stroke="#0b1f26"
+                      stroke-width="2"
+                    />
+                    <path d="M20 13 L26 16 L26 21 L20 27 L14 21 L14 16 Z" fill="#0b1f26" />
+                  </svg>
+                  <p>
+                    <strong>Shield</strong> — vaporises the first thing it touches, for six seconds.
+                  </p>
+                </li>
+                <li class="guide__item">
+                  <svg class="guide__icon" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle
+                      cx="20"
+                      cy="20"
+                      r="13"
+                      fill="#ffc94a"
+                      stroke="#0b1f26"
+                      stroke-width="2"
+                    />
+                    <circle cx="20" cy="20" r="6" fill="#0b1f26" />
+                    <path
+                      d="M20 16.5 L20 20 L22.5 21"
+                      fill="none"
+                      stroke="#ffc94a"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                  <p><strong>Slow-mo</strong> — the field slows for five seconds. You do not.</p>
+                </li>
+                <li class="guide__item">
+                  <svg class="guide__icon" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle
+                      cx="20"
+                      cy="20"
+                      r="13"
+                      fill="#ff8ab3"
+                      stroke="#0b1f26"
+                      stroke-width="2"
+                    />
+                    <path
+                      d="M20 26 L14 19.5 L16.8 15.5 L20 18.5 L23.2 15.5 L26 19.5 Z"
+                      fill="#0b1f26"
+                    />
+                  </svg>
+                  <p><strong>Extra life</strong> — survive one more hit, up to four.</p>
+                </li>
+              </ul>
+              <p class="guide__footnote">
+                Every 25 seconds you cross into a new sector, and the field changes colour with it.
+              </p>
+              <div class="screen__actions">
+                <button class="button button--primary" id="guide-back" type="button" data-autofocus>
+                  Back
+                </button>
+              </div>
+            </section>
+
             <section class="screen" id="screen-about" aria-labelledby="about-heading" hidden>
               <h2 class="screen__title" id="about-heading">About</h2>
               <div class="prose">
                 <p>
                   <strong>Dodge Asteroid</strong> is a small arcade game: stay alive as the field
-                  fills up. Score comes from time survived and asteroids dodged, and threading a
-                  near miss builds a combo multiplier.
+                  fills up. Score comes from time survived, rocks dodged and star shards collected,
+                  and threading a near miss builds a combo that multiplies all of it.
                 </p>
                 <p>
                   It is written in TypeScript and rendered with the Canvas 2D API, with no runtime
                   dependencies. The simulation runs on a fixed timestep, so it behaves identically
                   at any frame rate, and every random value comes from a seeded generator, which
-                  makes a whole run reproducible in tests.
+                  makes a whole run reproducible in tests. The music and every sound are synthesised
+                  as you play.
                 </p>
                 <p class="prose__controls">
                   <strong>Controls</strong> — move with the mouse, touch, arrow keys or
@@ -191,6 +351,11 @@
                 </button>
               </div>
             </section>
+          </div>
+
+          <div class="sector-banner" id="sector-banner" aria-hidden="true">
+            <span class="sector-banner__kicker" id="sector-kicker"></span>
+            <span class="sector-banner__name" id="sector-name"></span>
           </div>
 
           <div class="countdown" id="countdown" aria-hidden="true"></div>

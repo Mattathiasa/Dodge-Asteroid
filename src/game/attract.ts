@@ -1,7 +1,7 @@
 import type { World } from './world.js';
 import { WORLD } from '../config.js';
 import { difficultyAt } from './difficulty.js';
-import { makeAsteroidSpec, nextSpawnTime, shouldSpawn } from './spawner.js';
+import { initAsteroid, makeAsteroidSpec, nextSpawnTime, shouldSpawn } from './spawner.js';
 
 /**
  * Where on the difficulty curve the menu backdrop sits.
@@ -26,19 +26,8 @@ export function updateAttract(world: World, dt: number): void {
   if (shouldSpawn(world.clockMs, world.nextSpawnAtMs, world.asteroids.active, difficulty)) {
     const spec = makeAsteroidSpec(difficulty, world.rng, WORLD.width);
     world.asteroids.spawn((a) => {
-      a.x = spec.x;
-      a.y = spec.y;
-      a.px = spec.x;
-      a.py = spec.y;
-      a.vx = spec.vx;
-      a.vy = spec.vy;
-      a.r = spec.r;
-      a.rot = 0;
-      a.rotSpeed = spec.rotSpeed;
-      a.shape = spec.shape;
-      a.skin = spec.skin;
+      initAsteroid(a, spec);
       a.scored = true;
-      a.nearMissed = false;
     });
     world.nextSpawnAtMs = nextSpawnTime(world.clockMs, difficulty, world.rng);
   }

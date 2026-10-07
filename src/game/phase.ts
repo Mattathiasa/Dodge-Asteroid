@@ -5,7 +5,7 @@
  * `isGamePaused`, `isAnimationPaused`) that could disagree with each other.
  * One explicit union plus a pure transition function removes that class of bug.
  */
-export type Phase = 'menu' | 'countdown' | 'playing' | 'paused' | 'gameOver';
+export type Phase = 'menu' | 'countdown' | 'playing' | 'dying' | 'paused' | 'gameOver';
 
 export type GameEvent =
   | { type: 'START' }
@@ -15,6 +15,8 @@ export type GameEvent =
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'DIE' }
+  /** The explosion has played out; show the run-over screen. */
+  | { type: 'DEATH_ELAPSED' }
   | { type: 'RESTART' }
   | { type: 'TO_MENU' };
 
@@ -38,7 +40,9 @@ export function reduce(phase: Phase, event: GameEvent): Phase {
     case 'RESUME':
       return phase === 'paused' ? 'playing' : phase;
     case 'DIE':
-      return phase === 'playing' ? 'gameOver' : phase;
+      return phase === 'playing' ? 'dying' : phase;
+    case 'DEATH_ELAPSED':
+      return phase === 'dying' ? 'gameOver' : phase;
     case 'RESTART':
       return phase === 'gameOver' || phase === 'paused' ? 'countdown' : phase;
     case 'TO_MENU':
@@ -46,9 +50,15 @@ export function reduce(phase: Phase, event: GameEvent): Phase {
   }
 }
 
-/** Whether the simulation should advance in this phase. */
+/**
+ * Whether the simulation should advance in this phase.
+ *
+ * It keeps running while the ship dies, so the explosion and the field around
+ * it play out instead of freezing on the frame of impact. Pausing is not
+ * offered then: there is nothing left to save.
+ */
 export function isSimulating(phase: Phase): boolean {
-  return phase === 'playing' || phase === 'countdown';
+  return phase === 'playing' || phase === 'countdown' || phase === 'dying';
 }
 
 /** Whether the player may steer in this phase. */

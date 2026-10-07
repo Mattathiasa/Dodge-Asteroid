@@ -63,6 +63,10 @@ export const DIFFICULTY = {
   driftX: { start: 20, peak: 90 },
   maxActive: { start: 5, peak: 22 },
   powerUpChance: { start: 0.04, peak: 0.1 },
+  /** Share of spawns that are telegraphed comets rather than rocks. */
+  cometChance: { start: 0.05, peak: 0.16 },
+  /** Milliseconds between strings of star shards. */
+  shardIntervalMs: { start: 3600, peak: 2300 },
 
   /** Randomness applied to each spawn interval, as a fraction. */
   spawnJitter: 0.25,
@@ -82,6 +86,54 @@ export const SCORING = {
   /** Multiplier gained per combo step. */
   comboStep: 0.15,
   comboMax: 10,
+} as const;
+
+/**
+ * Comets are the one hazard that is telegraphed: a lane lights up, then a fast
+ * rock comes straight down it. Speed without warning is unfair; speed with a
+ * clear warning is a test of attention, which is the point.
+ */
+export const COMETS = {
+  /** Intensity below which no comets appear, so the opening stays readable. */
+  minIntensity: 0.12,
+  /** Seconds the lane is lit before the comet launches. */
+  warnSeconds: 0.95,
+  speed: 560,
+  radiusMin: 9,
+  radiusMax: 12,
+  /** Index into the renderer's colour families, reserved for comets. */
+  skin: 5,
+} as const;
+
+/**
+ * Star shards are the reason to move. Without them the best strategy is to
+ * hover low and wait, which is safe and dull; a string of shards drifting
+ * between two rocks is a decision.
+ */
+export const SHARDS = {
+  radius: 8,
+  fallSpeed: 150,
+  countMin: 3,
+  countMax: 5,
+  /** Vertical gap between shards in one string. */
+  spacing: 30,
+  /** Largest sideways step between shards, for diagonal strings. */
+  maxStepX: 24,
+  /** Shards inside this distance are pulled toward the ship. */
+  magnetRadius: 58,
+  magnetAccel: 2600,
+  points: 10,
+  /** Shards collected within this window of each other form a chain. */
+  chainWindowMs: 650,
+  capacity: 32,
+} as const;
+
+/** The field changes character every so often, and says so. */
+export const SECTORS = {
+  /** Seconds of (difficulty-scaled) time per sector. */
+  seconds: 25,
+  /** How often a rock takes the sector's colour family rather than a random one. */
+  skinBias: 0.65,
 } as const;
 
 export const POWERUPS = {
@@ -106,6 +158,21 @@ export const PARTICLES = {
   minLife: 0.3,
   maxLife: 0.95,
   drag: 0.86,
+} as const;
+
+/**
+ * Moments the game deliberately holds on, because an impact that resolves in a
+ * single frame does not register as an impact.
+ */
+export const FEEL = {
+  /** Seconds the simulation freezes when a life is lost. */
+  hitStopOnLifeLost: 0.11,
+  /** Seconds the simulation freezes on the fatal hit. */
+  hitStopOnDestroyed: 0.16,
+  /** Seconds the explosion plays before the run-over screen appears. */
+  deathSeconds: 1.15,
+  /** World time scale while the explosion plays out. */
+  deathTimeScale: 0.35,
 } as const;
 
 export const CAMERA = {
@@ -140,28 +207,44 @@ export const SPAWN = {
   powerUpCapacity: 8,
   /** Distinct asteroid silhouettes. */
   shapeCount: 6,
-  /** Distinct asteroid colour families. */
+  /** Distinct rock colour families. Comets have one more, of their own. */
   skinCount: 5,
 } as const;
 
-/** Named colours, so the palette can be changed in one edit. */
+/**
+ * Named colours, so the palette can be changed in one edit.
+ *
+ * "Deep sea": a dark teal field, bone panels, coral for action and a
+ * bioluminescent mint ship. Hazards stay in warm or saturated families, so
+ * nothing that can kill you shares a hue with the field or with the ship.
+ * The stylesheet's tokens mirror these, so the frame and the field match.
+ */
 export const PALETTE = {
-  background: '#0a0620',
-  backgroundGlow: '#241350',
-  starFar: '#463a86',
-  starMid: '#7d74c8',
-  starNear: '#cfd2ff',
-  ship: '#4ff0ff',
-  shipGlow: '#0affff',
-  shipTrail: '#2ad4ff',
-  shield: '#7dffc4',
-  asteroid: '#ff4fa3',
-  asteroidGlow: '#ff2d8a',
-  asteroidCore: '#3a0f2a',
-  powerShield: '#7dffc4',
-  powerSlowmo: '#ffd35c',
-  powerLife: '#ff7bd5',
-  text: '#e8ecff',
+  background: '#04141c',
+  backgroundGlow: '#0b3442',
+  starFar: '#1d4752',
+  starMid: '#4d8c96',
+  starNear: '#d2f5ef',
+  /** Outlines and text on light surfaces. */
+  ink: '#0b1f26',
+  /** Light surfaces and text on dark ones. */
+  bone: '#f4efe6',
+  ship: '#7dffd8',
+  shipGlow: '#2effc0',
+  shipTrail: '#5cf2c9',
+  shipShade: '#12957a',
+  shipOutline: '#063a30',
+  shipCockpit: '#05282a',
+  shield: '#7cc8ff',
+  /** Sparks thrown off when a rock hits the ship. */
+  asteroid: '#ff6b4a',
+  powerShield: '#7cc8ff',
+  powerSlowmo: '#ffc94a',
+  powerLife: '#ff8ab3',
+  combo: '#ffc94a',
+  shard: '#ffe7a3',
+  shardCore: '#fffaf0',
+  danger: '#ff3d6e',
 } as const;
 
 export const STORAGE_KEY = 'dodge-asteroid:profile';

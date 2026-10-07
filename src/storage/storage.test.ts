@@ -65,6 +65,12 @@ describe('migrate', () => {
     expect(profile.leaderboard).toHaveLength(1);
   });
 
+  it('defaults music on for profiles saved before it existed', () => {
+    expect(migrate({ version: 1, bestScore: 5 }).music).toBe(true);
+    expect(migrate({ version: 1, music: 'yes' }).music).toBe(true);
+    expect(migrate({ version: 1, music: false }).music).toBe(false);
+  });
+
   it('drops junk leaderboard entries and sorts what remains', () => {
     const profile = migrate({
       version: 1,
@@ -145,5 +151,12 @@ describe('recordRun', () => {
     const scores = profile.leaderboard.map((e) => e.score);
     expect(scores).toEqual([...scores].sort((a, b) => b - a));
     expect(scores[0]).toBe((LEADERBOARD_SIZE + 8) * 10);
+  });
+
+  it('stamps the entry with the given time, so the caller can find it again', () => {
+    let profile = recordRun(DEFAULT_PROFILE, 300, 20, 1000);
+    profile = recordRun(profile, 300, 25, 2000);
+    profile = recordRun(profile, 900, 40, 3000);
+    expect(profile.leaderboard.map((e) => e.at)).toEqual([3000, 1000, 2000]);
   });
 });

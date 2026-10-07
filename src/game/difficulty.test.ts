@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIFFICULTY } from '../config.js';
+import { COMETS, DIFFICULTY } from '../config.js';
 import { difficultyAt, intensityAt } from './difficulty.js';
 
 const PLATEAU_AT = DIFFICULTY.graceSeconds + DIFFICULTY.rampSeconds;
@@ -81,5 +81,24 @@ describe('difficultyAt', () => {
       difficultyAt(PLATEAU_AT).spawnIntervalMs,
       6,
     );
+  });
+
+  it('holds comets back until the ramp has started to bite', () => {
+    for (let t = 0; t <= PLATEAU_AT * 2; t += 0.5) {
+      const d = difficultyAt(t);
+      if (d.intensity < COMETS.minIntensity) expect(d.cometChance).toBe(0);
+      expect(d.cometChance).toBeGreaterThanOrEqual(0);
+      expect(d.cometChance).toBeLessThanOrEqual(1);
+    }
+    expect(difficultyAt(PLATEAU_AT).cometChance).toBeCloseTo(DIFFICULTY.cometChance.peak, 6);
+  });
+
+  it('sends shard strings more often as the run goes on', () => {
+    expect(difficultyAt(0).shardIntervalMs).toBe(DIFFICULTY.shardIntervalMs.start);
+    expect(difficultyAt(PLATEAU_AT).shardIntervalMs).toBeCloseTo(
+      DIFFICULTY.shardIntervalMs.peak,
+      6,
+    );
+    expect(difficultyAt(PLATEAU_AT).shardIntervalMs).toBeLessThan(difficultyAt(0).shardIntervalMs);
   });
 });

@@ -24,64 +24,78 @@ export interface MeteorSkin {
 
 export const METEOR_SKINS: readonly MeteorSkin[] = [
   {
-    name: 'ember',
-    bodyLight: '#ffc46b',
-    bodyMid: '#f2792a',
-    bodyDark: '#a8330d',
-    outline: '#54160a',
-    crater: '#a33a12',
-    craterLip: '#ffb15e',
-    trailHot: '#fff1a8',
-    trailCool: '#ff5f1a',
-    glow: '#ff8a2b',
+    name: 'rust',
+    bodyLight: '#ffbf94',
+    bodyMid: '#e8673d',
+    bodyDark: '#93300f',
+    outline: '#3d1206',
+    crater: '#a33d17',
+    craterLip: '#ffb489',
+    trailHot: '#ffeccc',
+    trailCool: '#ff6a3d',
+    glow: '#ff7c4d',
   },
   {
-    name: 'ice',
-    bodyLight: '#dcf6ff',
-    bodyMid: '#5cc4ef',
-    bodyDark: '#1c6ba1',
-    outline: '#0b2f4d',
-    crater: '#2b7ba8',
-    craterLip: '#a9e6ff',
-    trailHot: '#eafcff',
-    trailCool: '#31c6ff',
-    glow: '#5ad2ff',
+    name: 'sand',
+    bodyLight: '#fff4d8',
+    bodyMid: '#e3c184',
+    bodyDark: '#97703c',
+    outline: '#3a2a10',
+    crater: '#b48d50',
+    craterLip: '#fff1cc',
+    trailHot: '#fffbf0',
+    trailCool: '#eab865',
+    glow: '#f5cf86',
   },
   {
-    name: 'toxic',
-    bodyLight: '#e4ff8f',
-    bodyMid: '#8fcf2f',
-    bodyDark: '#3f7a12',
-    outline: '#1d3a08',
-    crater: '#4f8c17',
-    craterLip: '#cdf76c',
-    trailHot: '#f6ffc0',
-    trailCool: '#8ade1f',
-    glow: '#a8e93a',
+    name: 'kelp',
+    bodyLight: '#e6f59a',
+    bodyMid: '#9fc33a',
+    bodyDark: '#4c6b14',
+    outline: '#1e2e06',
+    crater: '#5e8519',
+    craterLip: '#d7ef7f',
+    trailHot: '#f4ffc8',
+    trailCool: '#a6d23a',
+    glow: '#b5df4a',
   },
   {
-    name: 'void',
-    bodyLight: '#e0c4ff',
-    bodyMid: '#9a5ce0',
-    bodyDark: '#4b2091',
-    outline: '#1f0b45',
-    crater: '#5f2ea8',
-    craterLip: '#d1a9ff',
-    trailHot: '#f7e9ff',
-    trailCool: '#a45cff',
-    glow: '#b06bff',
+    name: 'urchin',
+    bodyLight: '#e6ccff',
+    bodyMid: '#9b63e8',
+    bodyDark: '#4a2296',
+    outline: '#1d0b42',
+    crater: '#6233ad',
+    craterLip: '#d6b3ff',
+    trailHot: '#f6ebff',
+    trailCool: '#a866ff',
+    glow: '#b47aff',
   },
   {
-    name: 'rose',
-    bodyLight: '#ffc9ec',
-    bodyMid: '#ff5fb4',
-    bodyDark: '#b81a76',
-    outline: '#4e0733',
-    crater: '#c22585',
-    craterLip: '#ffb0e0',
-    trailHot: '#fff0fa',
-    trailCool: '#ff4fb5',
-    glow: '#ff6ec2',
+    name: 'coral',
+    bodyLight: '#ffd0de',
+    bodyMid: '#ff6f96',
+    bodyDark: '#b3264f',
+    outline: '#4d0a1f',
+    crater: '#c93460',
+    craterLip: '#ffb6ca',
+    trailHot: '#fff0f4',
+    trailCool: '#ff5a86',
+    glow: '#ff7da0',
+  },
+  // Comets only. White-hot with a tail in the warning-lane red, so the thing
+  // that falls is visibly the thing the lane warned about.
+  {
+    name: 'comet',
+    bodyLight: '#ffffff',
+    bodyMid: '#ffe4ea',
+    bodyDark: '#ff7d98',
+    outline: '#4d0618',
+    crater: '#ffb3c3',
+    craterLip: '#ffffff',
+    trailHot: '#fff4ec',
+    trailCool: '#ff3d6e',
+    glow: '#ff8ca4',
   },
 ] as const;
 
@@ -198,6 +212,8 @@ export interface MeteorDrawOptions {
   /** Animates the flame. */
   readonly time: number;
   readonly effects: boolean;
+  /** Multiplies the tail length; comets burn longer. */
+  readonly tailScale?: number;
 }
 
 export function drawMeteor(ctx: CanvasRenderingContext2D, o: MeteorDrawOptions): void {
@@ -206,7 +222,7 @@ export function drawMeteor(ctx: CanvasRenderingContext2D, o: MeteorDrawOptions):
   if (skin === undefined || silhouette === undefined) return;
 
   const flicker = 1 + Math.sin(o.time * 14 + o.shape * 2.1) * 0.12;
-  const tailLength = o.r * (3.6 + o.speedRatio * 5.2) * flicker;
+  const tailLength = o.r * (3.6 + o.speedRatio * 5.2) * flicker * (o.tailScale ?? 1);
 
   ctx.save();
   ctx.translate(o.x, o.y);

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A neon arcade dodging game built with TypeScript and Canvas 2D.",
+  "description": "A sticker-arcade dodging game built with TypeScript and Canvas 2D.",
   "author": "Mattathias Abraham (https://github.com/Mattathiasa)",
   "license": "MIT",
   "repository": {

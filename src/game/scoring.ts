@@ -1,7 +1,7 @@
-import { SCORING } from '../config.js';
+import { SCORING, SHARDS } from '../config.js';
 
 export interface ScoreState {
-  /** Total displayed score: survival points plus dodge bonuses. */
+  /** Total displayed score: survival points plus bonuses. */
   points: number;
   dodges: number;
   combo: number;
@@ -9,12 +9,28 @@ export interface ScoreState {
   comboExpiresAt: number;
   /** Seconds survived, the basis for survival points. */
   survivalTime: number;
-  /** Points awarded for dodges and near misses. */
+  /** Points awarded for dodges, near misses and shards. */
   bonusPoints: number;
+  /** Near misses this run, for the run summary. */
+  nearMisses: number;
+  /** Highest combo reached this run. */
+  bestCombo: number;
+  /** Star shards collected this run. */
+  shards: number;
 }
 
 export function createScoreState(): ScoreState {
-  return { points: 0, dodges: 0, combo: 0, comboExpiresAt: 0, survivalTime: 0, bonusPoints: 0 };
+  return {
+    points: 0,
+    dodges: 0,
+    combo: 0,
+    comboExpiresAt: 0,
+    survivalTime: 0,
+    bonusPoints: 0,
+    nearMisses: 0,
+    bestCombo: 0,
+    shards: 0,
+  };
 }
 
 /** Combo multiplier, capped so a long run cannot inflate the score without limit. */
@@ -23,9 +39,15 @@ export function comboMultiplier(combo: number): number {
   return 1 + steps * SCORING.comboStep;
 }
 
-/** Expires a lapsed combo. Separated so both scoring paths can call it. */
+/** Expires a lapsed combo. Separated so every scoring path can call it. */
 export function expireCombo(state: ScoreState, nowMs: number): void {
   if (state.combo > 0 && nowMs >= state.comboExpiresAt) state.combo = 0;
+}
+
+/** Fraction of the combo window still remaining, 0 when there is no combo. */
+export function comboRemaining(state: ScoreState, nowMs: number): number {
+  if (state.combo === 0) return 0;
+  return Math.max(0, Math.min(1, (state.comboExpiresAt - nowMs) / SCORING.comboWindowMs));
 }
 
 /**
@@ -41,12 +63,19 @@ function recomputeTotal(state: ScoreState): void {
   state.points = survival + state.bonusPoints;
 }
 
+function award(state: ScoreState, base: number): number {
+  const awarded = Math.round(base * comboMultiplier(state.combo));
+  state.bonusPoints += awarded;
+  recomputeTotal(state);
+  return awarded;
+}
+
 /**
  * Awards survival points.
  *
  * The original counted asteroids *spawned* and called it "Level", so the number
  * went up whether or not the player did anything. Score here is time survived
- * plus what the player actually dodged.
+ * plus what the player actually did.
  */
 export function tickScore(state: ScoreState, dt: number, nowMs: number): void {
   expireCombo(state, nowMs);
@@ -54,19 +83,32 @@ export function tickScore(state: ScoreState, dt: number, nowMs: number): void {
   recomputeTotal(state);
 }
 
-/** Records a dodged asteroid. Returns the points awarded. */
-export function applyDodge(state: ScoreState, nowMs: number, nearMiss: boolean): number {
+/** Records an asteroid that left the field without touching the ship. */
+export function applyDodge(state: ScoreState, nowMs: number): number {
   expireCombo(state, nowMs);
   state.dodges += 1;
+  return award(state, SCORING.pointsPerDodge);
+}
 
-  if (nearMiss) {
-    state.combo += 1;
-    state.comboExpiresAt = nowMs + SCORING.comboWindowMs;
-  }
+/**
+ * Records a near miss, the moment the rock clears the ship.
+ *
+ * This is awarded when the rock leaves the near-miss margin, not when it leaves
+ * the screen. Paying out a second later, at the bottom edge, disconnects the
+ * reward from the thing the player did to earn it.
+ */
+export function applyNearMiss(state: ScoreState, nowMs: number): number {
+  expireCombo(state, nowMs);
+  state.combo += 1;
+  state.bestCombo = Math.max(state.bestCombo, state.combo);
+  state.nearMisses += 1;
+  state.comboExpiresAt = nowMs + SCORING.comboWindowMs;
+  return award(state, SCORING.nearMissBonus);
+}
 
-  const base = SCORING.pointsPerDodge + (nearMiss ? SCORING.nearMissBonus : 0);
-  const awarded = Math.round(base * comboMultiplier(state.combo));
-  state.bonusPoints += awarded;
-  recomputeTotal(state);
-  return awarded;
+/** Records a collected shard. The combo multiplies it but is not extended by it. */
+export function applyShard(state: ScoreState, nowMs: number): number {
+  expireCombo(state, nowMs);
+  state.shards += 1;
+  return award(state, SHARDS.points);
 }

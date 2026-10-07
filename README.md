@@ -176,7 +176,7 @@ To regenerate the media in this README:
 
 ```bash
 npm run build && npm run preview -- --port 4173 --strictPort &
-npm run media    # screenshots, the demo GIF, and the store cards
+npm run media    # screenshots, the demo GIF, the store cards and public/og.jpg
 npm run decks    # the two slide decks in docs/decks/
 ```
 
@@ -206,7 +206,7 @@ to avoid:
 | The ship rendered a full body-width away from the cursor                                                                                                                       | One tested coordinate mapping                                       |
 | Mouse only, with no viewport meta tag, so it could not be played on a phone                                                                                                    | Mouse, touch and keyboard                                           |
 | 86 KB of vendored jQuery carrying three CVEs                                                                                                                                   | No runtime dependencies                                             |
-| No tests, no CI, no licence                                                                                                                                                    | 206 unit tests, 16 e2e specs, CI on every push                      |
+| No tests, no CI, no licence                                                                                                                                                    | 206 unit tests, 17 e2e specs, CI on every push                      |
 
 ## Licence
 

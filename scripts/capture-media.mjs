@@ -59,78 +59,104 @@ await page.evaluate(async (source) => {
   window.__gifenc = await import(url);
 }, gifencSource);
 
-await page.getByRole('button', { name: 'Play', exact: true }).click();
-await page.waitForFunction(() => window.__dodge.snapshot().phase === 'playing', null, {
-  timeout: 20_000,
-});
+const waitForPlaying = () =>
+  page.waitForFunction(() => window.__dodge.snapshot().phase === 'playing', null, {
+    timeout: 20_000,
+  });
 
-// Kick off recording without awaiting, so the mouse can fly the ship while the
-// page records.
-const recording = page.evaluate(
-  async ({ width, fps, seconds }) => {
-    const { GIFEncoder, quantize, applyPalette } = window.__gifenc;
-    const source = document.getElementById('game');
-    const height = Math.round((width * source.height) / source.width);
+/** Records the canvas as a GIF, entirely inside the page. */
+const record = () =>
+  page.evaluate(
+    async ({ width, fps, seconds }) => {
+      const { GIFEncoder, quantize, applyPalette } = window.__gifenc;
+      const source = document.getElementById('game');
+      const height = Math.round((width * source.height) / source.width);
 
-    const scratch = document.createElement('canvas');
-    scratch.width = width;
-    scratch.height = height;
-    const ctx = scratch.getContext('2d', { willReadFrequently: true });
+      const scratch = document.createElement('canvas');
+      scratch.width = width;
+      scratch.height = height;
+      const ctx = scratch.getContext('2d', { willReadFrequently: true });
 
-    const encoder = GIFEncoder();
-    const delay = Math.round(1000 / fps);
-    const totalFrames = Math.round(fps * seconds);
+      const encoder = GIFEncoder();
+      const delay = Math.round(1000 / fps);
+      const totalFrames = Math.round(fps * seconds);
 
-    for (let i = 0; i < totalFrames; i += 1) {
-      ctx.drawImage(source, 0, 0, width, height);
-      const { data } = ctx.getImageData(0, 0, width, height);
-      // A per-frame palette keeps the neon glow from banding.
-      const palette = quantize(data, 128, { format: 'rgb565' });
-      encoder.writeFrame(applyPalette(data, palette, 'rgb565'), width, height, {
-        palette,
-        delay,
-      });
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
+      for (let i = 0; i < totalFrames; i += 1) {
+        ctx.drawImage(source, 0, 0, width, height);
+        const { data } = ctx.getImageData(0, 0, width, height);
+        // A per-frame palette keeps the neon glow from banding.
+        const palette = quantize(data, 128, { format: 'rgb565' });
+        encoder.writeFrame(applyPalette(data, palette, 'rgb565'), width, height, {
+          palette,
+          delay,
+        });
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
 
-    encoder.finish();
-    const bytes = encoder.bytes();
-    let binary = '';
-    for (const byte of bytes) binary += String.fromCharCode(byte);
-    return { base64: btoa(binary), frames: totalFrames, width, height };
-  },
-  { width: GIF_WIDTH, fps: GIF_FPS, seconds: GIF_SECONDS },
-);
+      encoder.finish();
+      const bytes = encoder.bytes();
+      let binary = '';
+      for (const byte of bytes) binary += String.fromCharCode(byte);
+      return { base64: btoa(binary), frames: totalFrames, width, height };
+    },
+    { width: GIF_WIDTH, fps: GIF_FPS, seconds: GIF_SECONDS },
+  );
 
-// Fly the ship for as long as the recording lasts, restarting if it ends.
-const deadline = Date.now() + GIF_SECONDS * 1000 + 1500;
-const started = Date.now();
-let actionShot = false;
-
-while (Date.now() < deadline) {
-  const t = (Date.now() - started) / 1000;
+const fly = async (t) => {
   await page.mouse.move(
     cx + Math.sin(t * 1.15) * box.width * 0.32,
     cy + Math.sin(t * 0.73 + 1) * box.height * 0.2 + box.height * 0.14,
   );
   await page.waitForTimeout(16);
+};
 
-  const state = await page.evaluate(() => window.__dodge.snapshot());
-  if (!actionShot && (state.asteroids >= 5 || state.elapsed >= 4.5)) {
-    await page.screenshot({ path: `${OUT}/gameplay.png` });
-    actionShot = true;
+await page.getByRole('button', { name: 'Play', exact: true }).click();
+await waitForPlaying();
+
+// A run that ends mid-recording spends half the GIF on the explosion, the
+// run-over screen and the countdown, so the recording is retried until it
+// catches a clean stretch of flying. The still is only taken while the ship
+// is alive and the field is busy, for the same reason.
+let gif = null;
+let actionShot = false;
+const MAX_ATTEMPTS = 10;
+
+for (let attempt = 1; attempt <= MAX_ATTEMPTS && gif === null; attempt += 1) {
+  const started = Date.now();
+  // Let the field fill up a little before recording.
+  while (Date.now() - started < 1500) await fly((Date.now() - started) / 1000);
+
+  const recording = record();
+  const deadline = Date.now() + GIF_SECONDS * 1000 + 600;
+  let survived = true;
+
+  while (Date.now() < deadline) {
+    await fly((Date.now() - started) / 1000);
+    const state = await page.evaluate(() => window.__dodge.snapshot());
+    if (state.phase !== 'playing') survived = false;
+    if (!actionShot && state.phase === 'playing' && state.asteroids >= 5) {
+      await page.screenshot({ path: `${OUT}/gameplay.png` });
+      actionShot = true;
+    }
   }
-  if (state.phase === 'gameOver') {
-    await page.getByRole('button', { name: 'Play again' }).click();
-    await page.waitForFunction(() => window.__dodge.snapshot().phase === 'playing', null, {
-      timeout: 20_000,
-    });
+
+  const result = await recording;
+  if (survived) {
+    gif = result;
+    break;
   }
+
+  console.log(`attempt ${String(attempt)}: the ship was hit mid-recording, retrying`);
+  await page.waitForFunction(() => window.__dodge.snapshot().phase === 'gameOver', null, {
+    timeout: 20_000,
+  });
+  await page.getByRole('button', { name: 'Play again' }).click();
+  await waitForPlaying();
 }
 
-if (!actionShot) await page.screenshot({ path: `${OUT}/gameplay.png` });
+if (gif === null) throw new Error(`no clean recording in ${String(MAX_ATTEMPTS)} attempts`);
+if (!actionShot) throw new Error('never caught a busy field for the gameplay still');
 
-const gif = await recording;
 writeFileSync(`${OUT}/demo.gif`, Buffer.from(gif.base64, 'base64'));
 console.log(`demo.gif: ${gif.frames} frames at ${gif.width}x${gif.height}`);
 

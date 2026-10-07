@@ -72,6 +72,16 @@ test('boots to the menu with a sized canvas', async ({ page }) => {
   expect((await snapshot(page)).phase).toBe('menu');
 });
 
+test('ships the link-preview image its social tags point to', async ({ page }) => {
+  const image = await page.locator('meta[property="og:image"]').getAttribute('content');
+  expect(image).toMatch(/\/og\.jpg$/);
+
+  // The tag holds the absolute Pages URL; the same file must be in the build.
+  const response = await page.request.get('/og.jpg');
+  expect(response.ok()).toBe(true);
+  expect(response.headers()['content-type']).toContain('image/jpeg');
+});
+
 test('starts a run and accumulates score over time', async ({ page }) => {
   await startRun(page);
   await expect

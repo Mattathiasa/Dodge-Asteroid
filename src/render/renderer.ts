@@ -249,8 +249,9 @@ export class Renderer {
 
   private drawAsteroids(ctx: CanvasRenderingContext2D, world: World, alpha: number): void {
     world.asteroids.forEach((a) => {
-      // A comet still waiting above the field is shown by its lane alone.
-      if (a.warn > 0) return;
+      // A comet still waiting above the field is shown by its lane alone, and a
+      // destroyed rock only holds its place; neither is drawn.
+      if (a.warn > 0 || a.ghost) return;
       drawMeteor(ctx, {
         x: lerp(a.px, a.x, alpha),
         y: lerp(a.py, a.y, alpha),

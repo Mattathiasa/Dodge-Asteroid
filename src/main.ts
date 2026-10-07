@@ -24,13 +24,27 @@ import { createEventBuffer } from './game/events.js';
 import { createRng, randomSeed } from './core/rng.js';
 import { createWorld, resetRun } from './game/world.js';
 import { intensityAt } from './game/difficulty.js';
-import { loadProfile, recordRun, saveProfile } from './storage/storage.js';
+import {
+  activeStreak,
+  dailyToday,
+  loadProfile,
+  recordDaily,
+  recordRun,
+  saveProfile,
+} from './storage/storage.js';
+import { createAnalytics } from './analytics/analytics.js';
+import { dailyKey, dailyNumber, dailySeed } from './core/daily.js';
+import { shareText } from './game/share.js';
 import { renderLeaderboard } from './ui/leaderboard.js';
 import { renderRunStats } from './ui/summary.js';
 import { updateAttract } from './game/attract.js';
 import { update } from './game/update.js';
 
+/** An endless run on a fresh seed, or today's shared daily run. */
+type RunMode = 'endless' | 'daily';
+
 const COUNTDOWN_SECONDS = 3;
+const SHARE_STATUS_MS = 3200;
 const SECTOR_BANNER_MS = 2600;
 /** The title screen drifts through the sector colours, a preview of the run. */
 const MENU_SECTOR_SECONDS = 7;
@@ -45,6 +59,7 @@ const MENU_SECTOR_SECONDS = 7;
  */
 export interface DebugSnapshot {
   phase: Phase;
+  mode: RunMode;
   score: number;
   elapsed: number;
   lives: number;
@@ -83,7 +98,11 @@ function start(): void {
   // ---- state ----
   let profile: Profile = loadProfile();
   let phase: Phase = 'menu';
-  let mode: DifficultyMode = 'normal';
+  let difficulty: DifficultyMode = 'normal';
+  let runMode: RunMode = 'endless';
+  /** The day a daily run belongs to, fixed when it starts. */
+  let runKey = dailyKey(new Date());
+  let shareTimer: number | undefined;
   let reducedMotion = profile.reducedMotion ?? prefersReducedMotion();
   /** Seconds the simulation is frozen for, after an impact. */
   let hitStop = 0;
@@ -101,6 +120,7 @@ function start(): void {
   const input = new InputManager(canvas);
   const renderer = new Renderer(canvas, 0xbeef);
   const announcer = new Announcer(must<HTMLElement>('live-region'));
+  const analytics = createAnalytics(import.meta.env.VITE_GOATCOUNTER_CODE);
   const { fx } = renderer;
 
   const hud = new Hud({
@@ -129,6 +149,11 @@ function start(): void {
   const sectorBanner = must<HTMLElement>('sector-banner');
   const sectorKicker = must<HTMLElement>('sector-kicker');
   const sectorName = must<HTMLElement>('sector-name');
+  const hudMode = must<HTMLElement>('hud-mode');
+  const dailyNumberEl = must<HTMLElement>('daily-number');
+  const dailyMeta = must<HTMLElement>('daily-meta');
+  const dailyResult = must<HTMLElement>('daily-result');
+  const shareStatus = must<HTMLElement>('share-status');
 
   // ---- viewport ----
   let viewport = computeViewport(
@@ -194,7 +219,7 @@ function start(): void {
     }
     return {
       showShip: true,
-      intensity: intensityAt(world.elapsed * world.difficultyScale),
+      intensity: intensityAt(world.fieldTime * world.difficultyScale),
       sector: world.sector,
     };
   };
@@ -209,8 +234,19 @@ function start(): void {
   };
 
   function beginRun(): void {
-    resetRun(world, randomSeed());
-    world.difficultyScale = DIFFICULTY_SCALES[mode];
+    // A daily run is always on today's seed at normal difficulty, so every
+    // score on the same day is a score on the same field.
+    if (runMode === 'daily') {
+      runKey = dailyKey(new Date());
+      resetRun(world, dailySeed(runKey));
+      world.difficultyScale = DIFFICULTY_SCALES.normal;
+      hudMode.textContent = `Daily #${String(dailyNumber(runKey))}`;
+    } else {
+      resetRun(world, randomSeed());
+      world.difficultyScale = DIFFICULTY_SCALES[difficulty];
+    }
+    hudMode.hidden = runMode !== 'daily';
+    analytics.track(`run/start/${runMode}`);
     world.countdown = COUNTDOWN_SECONDS;
     camera.trauma = 0;
     hitStop = 0;
@@ -222,17 +258,20 @@ function start(): void {
     loop.resync();
   }
 
-  function finishRun(): void {
-    const before = profile.bestScore;
-    const { score } = world;
-    const at = Date.now();
-    profile = recordRun(profile, score.points, score.survivalTime, at);
-    persist();
+  /** The best the current run is measured against: today's, for a daily. */
+  function currentBest(): number {
+    if (runMode === 'daily' && phase !== 'menu') return dailyToday(profile, runKey)?.best ?? 0;
+    return profile.bestScore;
+  }
 
+  function finishRun(): void {
+    if (runMode === 'daily') finishDaily();
+    else finishEndless();
+
+    const { score } = world;
     countUp(must<HTMLElement>('final-score'), score.points);
     must<HTMLElement>('final-meta').textContent =
       `${formatTime(score.survivalTime)} survived · ${String(score.dodges)} dodged`;
-
     renderRunStats(must('run-stats'), {
       nearMisses: score.nearMisses,
       bestCombo: score.bestCombo,
@@ -240,6 +279,58 @@ function start(): void {
       sector: world.sector,
       sectorName: sectorInfo(world.sector).name,
     });
+    setShareStatus('');
+    refreshMenuStats();
+
+    analytics.track(`run/end/${runMode}`);
+    analytics.track(`run/end/${runMode}/sector-${String(Math.min(world.sector + 1, 7))}`);
+  }
+
+  function finishDaily(): void {
+    const { score } = world;
+    const before = dailyToday(profile, runKey)?.best ?? 0;
+    profile = recordDaily(profile, runKey, {
+      score: score.points,
+      timeSeconds: score.survivalTime,
+      sector: world.sector,
+      bestCombo: score.bestCombo,
+    });
+    persist();
+
+    const today = dailyToday(profile, runKey);
+    const isBest = score.points > before && score.points > 0;
+    const note = must<HTMLElement>('best-banner');
+    note.hidden = !isBest;
+    note.textContent = 'Best today';
+    note.classList.remove('screen__best--rank');
+
+    dailyResult.hidden = false;
+    const tries = today?.attempts ?? 1;
+    dailyResult.textContent = '';
+    const label = document.createElement('strong');
+    label.textContent = `Daily #${String(dailyNumber(runKey))}`;
+    dailyResult.append(
+      label,
+      ` · best today ${(today?.best ?? 0).toLocaleString()} · ${String(tries)} ${
+        tries === 1 ? 'try' : 'tries'
+      }`,
+    );
+
+    // The endless board would only confuse a daily result.
+    must<HTMLElement>('gameover-leaderboard').textContent = '';
+
+    announcer.sayNow(
+      `Daily run over. Score ${String(score.points)}.${isBest ? ' Best today.' : ''}`,
+    );
+  }
+
+  function finishEndless(): void {
+    const before = profile.bestScore;
+    const { score } = world;
+    const at = Date.now();
+    profile = recordRun(profile, score.points, score.survivalTime, at);
+    persist();
+    dailyResult.hidden = true;
 
     const isBest = score.points > before && score.points > 0;
     const rank = profile.leaderboard.findIndex((e) => e.at === at && e.score === score.points);
@@ -252,7 +343,6 @@ function start(): void {
       limit: 5,
       highlightAt: at,
     });
-    refreshMenuStats();
 
     announcer.sayNow(
       `Run over. Score ${String(score.points)}.${isBest ? ' New personal best.' : ''}`,
@@ -405,7 +495,9 @@ function start(): void {
         if (action === 'pause') dispatch({ type: 'TOGGLE_PAUSE' });
         if (action === 'restart' && phase !== 'menu') dispatch({ type: 'RESTART' });
         if (action === 'mute') toggleMute();
-        if (action === 'confirm') {
+        // A focused control handles its own Enter and Space. Acting here as
+        // well would race its click, and Space only clicks on key-up.
+        if (action === 'confirm' && !isControl(document.activeElement)) {
           audio.unlock();
           if (phase === 'menu' || phase === 'gameOver') dispatch({ type: 'START' });
           else if (phase === 'paused') dispatch({ type: 'RESUME' });
@@ -470,7 +562,7 @@ function start(): void {
 
     render: (alpha) => {
       renderer.draw(world, alpha, viewport, camera, scene());
-      hud.update(world, profile.bestScore);
+      hud.update(world, currentBest());
       audio.tick();
     },
   });
@@ -500,6 +592,86 @@ function start(): void {
       stats.append(row);
     }
     renderLeaderboard(must('menu-leaderboard'), profile.leaderboard, { limit: 3 });
+    refreshDailyCard();
+  }
+
+  /** The daily card: today's number, your best so far, and the streak. */
+  function refreshDailyCard(): void {
+    const today = dailyKey(new Date());
+    dailyNumberEl.textContent = `#${String(dailyNumber(today))}`;
+
+    const record = dailyToday(profile, today);
+    const streak = activeStreak(profile, today);
+    const parts: string[] = [];
+    if (record === null) parts.push('Same field for everyone today');
+    else {
+      const tries = record.attempts;
+      parts.push(
+        `Best ${record.best.toLocaleString()} · ${String(tries)} ${tries === 1 ? 'try' : 'tries'}`,
+      );
+    }
+    if (streak > 0) parts.push(`${String(streak)}-day streak`);
+    dailyMeta.textContent = parts.join(' · ');
+  }
+
+  // ---- sharing ----
+  function setShareStatus(message: string): void {
+    window.clearTimeout(shareTimer);
+    shareStatus.textContent = message;
+    if (message !== '') {
+      shareTimer = window.setTimeout(() => (shareStatus.textContent = ''), SHARE_STATUS_MS);
+    }
+  }
+
+  /** The canonical address, so a share from a local build still links to the game. */
+  function gameUrl(): string {
+    const canonical = document.querySelector<HTMLMetaElement>('meta[property="og:url"]');
+    return canonical?.content ?? window.location.href;
+  }
+
+  /**
+   * Shares the result: today's best for a daily, this run for an endless one.
+   *
+   * Uses the system share sheet where there is one (phones), and the clipboard
+   * everywhere else, or when the share sheet refuses.
+   */
+  async function shareResult(): Promise<void> {
+    const record = dailyToday(profile, runKey);
+    const text =
+      runMode === 'daily' && record !== null
+        ? shareText({
+            score: record.best,
+            sector: record.bestSector,
+            bestCombo: record.bestCombo,
+            daily: { number: dailyNumber(runKey), attempts: record.attempts },
+            url: gameUrl(),
+          })
+        : shareText({
+            score: world.score.points,
+            sector: world.sector,
+            bestCombo: world.score.bestCombo,
+            url: gameUrl(),
+          });
+
+    analytics.track(`share/${runMode}`);
+
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ text });
+        setShareStatus('Shared.');
+        return;
+      } catch (error) {
+        // The player closed the sheet: that is an answer, not a failure.
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareStatus('Copied to the clipboard.');
+    } catch {
+      setShareStatus('Could not copy. Your browser blocked the clipboard.');
+    }
   }
 
   const difficultySelect = must<HTMLSelectElement>('difficulty-select');
@@ -507,14 +679,18 @@ function start(): void {
   const soundToggle = must<HTMLInputElement>('sound-toggle');
   const musicToggle = must<HTMLInputElement>('music-toggle');
 
-  const onPlay = (): void => {
+  const startRun = (next: RunMode): void => {
+    runMode = next;
     audio.unlock();
     audio.play('start');
     dispatch({ type: 'START' });
   };
 
-  must('play-button').addEventListener('click', onPlay);
-  must('again-button').addEventListener('click', onPlay);
+  must('play-button').addEventListener('click', () => startRun('endless'));
+  must('daily-button').addEventListener('click', () => startRun('daily'));
+  // Playing again stays in the same mode: another daily attempt, or another run.
+  must('again-button').addEventListener('click', () => startRun(runMode));
+  must('share-button').addEventListener('click', () => void shareResult());
   must('resume-button').addEventListener('click', () => dispatch({ type: 'RESUME' }));
   must('restart-button').addEventListener('click', () => dispatch({ type: 'RESTART' }));
   must('quit-button').addEventListener('click', () => dispatch({ type: 'TO_MENU' }));
@@ -529,7 +705,7 @@ function start(): void {
   must('guide-back').addEventListener('click', () => overlays.show('menu'));
 
   difficultySelect.addEventListener('change', () => {
-    if (isDifficultyMode(difficultySelect.value)) mode = difficultySelect.value;
+    if (isDifficultyMode(difficultySelect.value)) difficulty = difficultySelect.value;
   });
 
   reducedMotionToggle.addEventListener('change', () => {
@@ -569,6 +745,7 @@ function start(): void {
   window.__dodge = {
     snapshot: (): DebugSnapshot => ({
       phase,
+      mode: runMode,
       score: world.score.points,
       elapsed: world.elapsed,
       lives: world.ship.lives,
@@ -583,7 +760,8 @@ function start(): void {
 
   // ---- go ----
   reducedMotionToggle.checked = reducedMotion;
-  difficultySelect.value = mode;
+  difficultySelect.value = difficulty;
+  must<HTMLElement>('analytics-note').hidden = !analytics.enabled;
   applyMotionPreference();
   applyMute();
   applyMusic();
@@ -594,6 +772,15 @@ function start(): void {
   overlays.show('menu');
   input.attach();
   loop.start();
+}
+
+function isControl(element: Element | null): boolean {
+  return (
+    element instanceof HTMLButtonElement ||
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLSelectElement ||
+    element instanceof HTMLAnchorElement
+  );
 }
 
 function labelFor(kind: 'shield' | 'slowmo' | 'life'): string {

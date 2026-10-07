@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PROFILE,
   LEADERBOARD_SIZE,
+  activeStreak,
+  dailyToday,
   loadProfile,
   migrate,
+  recordDaily,
   recordRun,
   saveProfile,
 } from './storage.js';
@@ -158,5 +161,110 @@ describe('recordRun', () => {
     profile = recordRun(profile, 300, 25, 2000);
     profile = recordRun(profile, 900, 40, 3000);
     expect(profile.leaderboard.map((e) => e.at)).toEqual([3000, 1000, 2000]);
+  });
+});
+
+describe('recordDaily', () => {
+  const result = (score: number, sector = 1, bestCombo = 3) => ({
+    score,
+    timeSeconds: score / 10,
+    sector,
+    bestCombo,
+  });
+
+  it('starts a record on the first attempt of the day', () => {
+    const profile = recordDaily(DEFAULT_PROFILE, '2026-10-08', result(500, 2, 7));
+    expect(profile.daily).toEqual({
+      key: '2026-10-08',
+      attempts: 1,
+      best: 500,
+      bestTimeSeconds: 50,
+      bestSector: 2,
+      bestCombo: 7,
+    });
+    expect(profile.streak).toBe(1);
+    expect(profile.runs).toBe(1);
+  });
+
+  it('keeps the best attempt, with its own figures, and counts every attempt', () => {
+    let profile = recordDaily(DEFAULT_PROFILE, '2026-10-08', result(500, 2, 7));
+    profile = recordDaily(profile, '2026-10-08', result(900, 4, 5));
+    profile = recordDaily(profile, '2026-10-08', result(300, 1, 12));
+    expect(profile.daily).toMatchObject({ attempts: 3, best: 900, bestSector: 4, bestCombo: 5 });
+    expect(profile.streak).toBe(1);
+  });
+
+  it('never touches the endless board or best', () => {
+    const profile = recordDaily(DEFAULT_PROFILE, '2026-10-08', result(5000));
+    expect(profile.bestScore).toBe(0);
+    expect(profile.leaderboard).toEqual([]);
+  });
+
+  it('starts a fresh record on a new day', () => {
+    let profile = recordDaily(DEFAULT_PROFILE, '2026-10-08', result(900));
+    profile = recordDaily(profile, '2026-10-09', result(100));
+    expect(profile.daily).toMatchObject({ key: '2026-10-09', attempts: 1, best: 100 });
+  });
+
+  it('extends the streak on consecutive days and resets it after a gap', () => {
+    let profile = recordDaily(DEFAULT_PROFILE, '2026-10-08', result(1));
+    profile = recordDaily(profile, '2026-10-09', result(1));
+    profile = recordDaily(profile, '2026-10-09', result(1));
+    profile = recordDaily(profile, '2026-10-10', result(1));
+    expect(profile.streak).toBe(3);
+
+    profile = recordDaily(profile, '2026-10-12', result(1));
+    expect(profile.streak).toBe(1);
+  });
+});
+
+describe('activeStreak', () => {
+  const played = (key: string, streak: number) => ({
+    ...DEFAULT_PROFILE,
+    daily: {
+      key,
+      attempts: 1,
+      best: 1,
+      bestTimeSeconds: 1,
+      bestSector: 0,
+      bestCombo: 0,
+    },
+    streak,
+  });
+
+  it('is still alive the day after, so a streak is not lost before you can play', () => {
+    expect(activeStreak(played('2026-10-08', 4), '2026-10-08')).toBe(4);
+    expect(activeStreak(played('2026-10-08', 4), '2026-10-09')).toBe(4);
+  });
+
+  it('is broken once a whole day is missed', () => {
+    expect(activeStreak(played('2026-10-08', 4), '2026-10-10')).toBe(0);
+    expect(activeStreak(DEFAULT_PROFILE, '2026-10-10')).toBe(0);
+  });
+
+  it("only reports today's record as today's", () => {
+    expect(dailyToday(played('2026-10-08', 1), '2026-10-08')?.best).toBe(1);
+    expect(dailyToday(played('2026-10-08', 1), '2026-10-09')).toBeNull();
+  });
+});
+
+describe('migrate daily data', () => {
+  it('keeps a valid record and drops a malformed one', () => {
+    const daily = {
+      key: '2026-10-08',
+      attempts: 2,
+      best: 40,
+      bestTimeSeconds: 4,
+      bestSector: 0,
+      bestCombo: 2,
+    };
+    expect(migrate({ version: 1, daily, streak: 3 }).daily).toEqual(daily);
+    expect(migrate({ version: 1, daily, streak: 3 }).streak).toBe(3);
+    expect(migrate({ version: 1, daily: { ...daily, key: 'today' } }).daily).toBeNull();
+    expect(migrate({ version: 1, daily: { ...daily, attempts: 0 } }).daily).toBeNull();
+    expect(migrate({ version: 1, daily: 'nope', streak: -2 })).toMatchObject({
+      daily: null,
+      streak: 0,
+    });
   });
 });

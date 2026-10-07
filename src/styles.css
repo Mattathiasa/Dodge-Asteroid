@@ -290,6 +290,24 @@ body[data-screen='guide'] .hud {
   text-shadow: 0 1px 0 var(--ink);
 }
 
+.hud__mode {
+  margin-bottom: 6px;
+  padding: 3px 11px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink);
+  background: var(--cyan);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+}
+
+.hud__mode[hidden] {
+  display: none;
+}
+
 .hud__combo,
 .hud__status {
   font-size: 0.74rem;
@@ -525,6 +543,25 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
   box-shadow: 0 3px 0 var(--ember-dark);
 }
 
+.screen__daily {
+  margin: 10px 0 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.screen__daily strong {
+  color: var(--ink);
+}
+
+.screen__share-status {
+  min-height: 1.2em;
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cyan-shade);
+}
+
 .screen__best--rank {
   color: var(--ink);
   background: var(--cream-2);
@@ -674,6 +711,53 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
 .cta--compact .cta__label {
   padding: 13px 22px;
   font-size: 1.1rem;
+}
+
+/* The daily run: the second way in, so mint rather than coral, and wide. */
+.daily-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: min(290px, 100%);
+  margin: 16px auto 0;
+  padding: 10px 16px 11px;
+  font: inherit;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--cyan-light) 0%, var(--cyan) 60%, #3fe0b8 100%);
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  box-shadow: 0 6px 0 var(--cyan-shade);
+  cursor: pointer;
+  transition:
+    transform 90ms ease,
+    box-shadow 90ms ease;
+}
+
+.daily-card:hover {
+  transform: translateY(-1px);
+}
+
+.daily-card:active {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--cyan-shade);
+}
+
+.daily-card__title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.daily-card__number {
+  color: var(--cyan-shade);
+}
+
+.daily-card__meta {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #10443a;
 }
 
 .home-actions {

@@ -45,6 +45,14 @@ export interface Asteroid extends Body {
   comet: boolean;
   /** Seconds left on a comet's lane warning; it holds still until this is 0. */
   warn: number;
+  /**
+   * Destroyed by the player, but still occupying its place in the field.
+   *
+   * A ghost is invisible and harmless and leaves when the rock would have. It
+   * exists so that what the player destroys cannot change what spawns next:
+   * the spawner's crowding check counts it exactly as if it were still there.
+   */
+  ghost: boolean;
 }
 
 /** A collectible. Shards are worth points and pulled in when the ship is close. */
@@ -105,6 +113,7 @@ export function createAsteroid(): Asteroid {
     nearMissed: false,
     comet: false,
     warn: 0,
+    ghost: false,
   };
 }
 

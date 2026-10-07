@@ -204,7 +204,8 @@ export const LOOP = {
 
 export const SPAWN = {
   asteroidCapacity: 64,
-  powerUpCapacity: 8,
+  /** Never reached in play, so an uncollected pickup can never block a spawn. */
+  powerUpCapacity: 16,
   /** Distinct asteroid silhouettes. */
   shapeCount: 6,
   /** Distinct rock colour families. Comets have one more, of their own. */

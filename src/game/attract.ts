@@ -19,17 +19,17 @@ const ATTRACT_TIME_SECONDS = 24;
  * of an empty starfield.
  */
 export function updateAttract(world: World, dt: number): void {
-  world.clockMs += dt * 1000;
+  world.fieldMs += dt * 1000;
 
   const difficulty = difficultyAt(ATTRACT_TIME_SECONDS);
 
-  if (shouldSpawn(world.clockMs, world.nextSpawnAtMs, world.asteroids.active, difficulty)) {
+  if (shouldSpawn(world.fieldMs, world.nextSpawnAtMs, world.asteroids.active, difficulty)) {
     const spec = makeAsteroidSpec(difficulty, world.rng, WORLD.width);
     world.asteroids.spawn((a) => {
       initAsteroid(a, spec);
       a.scored = true;
     });
-    world.nextSpawnAtMs = nextSpawnTime(world.clockMs, difficulty, world.rng);
+    world.nextSpawnAtMs = nextSpawnTime(world.fieldMs, difficulty, world.rng);
   }
 
   world.asteroids.forEach((a) => {

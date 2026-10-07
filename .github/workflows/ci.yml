@@ -32,6 +32,10 @@ jobs:
       - run: npm run format:check
       - run: npm run test
       - run: npm run build
+        env:
+          # Optional. A GoatCounter site code, set as a repository variable,
+          # turns on anonymous usage counts; unset, the build ships none.
+          VITE_GOATCOUNTER_CODE: ${{ vars.GOATCOUNTER_CODE }}
 
       - name: Upload Pages artifact
         if: github.ref == 'refs/heads/main'

@@ -47,6 +47,8 @@ export function update(world: World, dt: number, input: FrameInput, events: SimE
 
   world.elapsed += dt;
   world.clockMs += dt * 1000;
+  world.fieldTime += worldDt;
+  world.fieldMs += worldDt * 1000;
 
   tickTimers(world, dt);
 
@@ -57,7 +59,9 @@ export function update(world: World, dt: number, input: FrameInput, events: SimE
     recordTrail(world);
   }
 
-  const scaledElapsed = world.elapsed * world.difficultyScale;
+  // Everything that decides what falls runs on field time, so the field is
+  // the same for every player who gets this seed, whatever they do in it.
+  const scaledElapsed = world.fieldTime * world.difficultyScale;
   const difficulty = difficultyAt(scaledElapsed);
 
   // Nothing spawns during the opening grace period, so the player has a moment
@@ -65,8 +69,8 @@ export function update(world: World, dt: number, input: FrameInput, events: SimE
   // once the ship is gone, so a comet cannot sound its warning over the wreck.
   if (ship.alive && scaledElapsed >= DIFFICULTY.graceSeconds) {
     advanceSector(world, scaledElapsed, events);
-    maybeSpawn(world, difficulty, events);
-    maybeSpawnShards(world, difficulty);
+    maybeSpawn(world, difficulty, worldDt, events);
+    maybeSpawnShards(world, worldDt);
   }
 
   advanceHazards(world, worldDt, events);
@@ -104,11 +108,30 @@ function advanceSector(world: World, scaledElapsed: number, events: SimEventSink
   events.emit({ type: 'sector', index: sector });
 }
 
-function maybeSpawn(world: World, difficulty: DifficultyParams, events: SimEventSink): void {
-  if (!shouldSpawn(world.clockMs, world.nextSpawnAtMs, world.asteroids.active, difficulty)) {
+/**
+ * When a spawn that is due counts as having happened, in field ms.
+ *
+ * A spawn noticed on the first tick past its deadline happened *at* the
+ * deadline: that keeps the schedule, and the rock, independent of how big the
+ * ticks are, which slow-mo changes. One held back by the crowding check really
+ * did happen later, so it is stamped with now.
+ */
+function spawnedAt(world: World, dueMs: number, fieldDt: number): number {
+  return world.fieldMs - dueMs < fieldDt * 1000 + 1e-6 ? dueMs : world.fieldMs;
+}
+
+function maybeSpawn(
+  world: World,
+  current: DifficultyParams,
+  fieldDt: number,
+  events: SimEventSink,
+): void {
+  if (!shouldSpawn(world.fieldMs, world.nextSpawnAtMs, world.asteroids.active, current)) {
     return;
   }
 
+  const at = spawnedAt(world, world.nextSpawnAtMs, fieldDt);
+  const difficulty = difficultyAt((at / 1000) * world.difficultyScale);
   const spec = makeHazardSpec(difficulty, world.rng, WORLD.width, sectorInfo(world.sector).skin);
   const spawned = world.asteroids.spawn((a) => initAsteroid(a, spec));
   if (spawned !== null && spec.comet) events.emit({ type: 'cometWarning', x: spec.x });
@@ -128,11 +151,14 @@ function maybeSpawn(world: World, difficulty: DifficultyParams, events: SimEvent
     });
   }
 
-  world.nextSpawnAtMs = nextSpawnTime(world.clockMs, difficulty, world.rng);
+  world.nextSpawnAtMs = nextSpawnTime(at, difficulty, world.rng);
 }
 
-function maybeSpawnShards(world: World, difficulty: DifficultyParams): void {
-  if (world.clockMs < world.nextShardAtMs) return;
+function maybeSpawnShards(world: World, fieldDt: number): void {
+  if (world.fieldMs < world.nextShardAtMs) return;
+
+  const at = spawnedAt(world, world.nextShardAtMs, fieldDt);
+  const difficulty = difficultyAt((at / 1000) * world.difficultyScale);
 
   const spec = makeShardString(world.rng, WORLD.width);
   for (let i = 0; i < spec.count; i += 1) {
@@ -150,7 +176,7 @@ function maybeSpawnShards(world: World, difficulty: DifficultyParams): void {
     });
   }
 
-  world.nextShardAtMs = nextShardTime(world.clockMs, difficulty, world.rng);
+  world.nextShardAtMs = nextShardTime(at, difficulty, world.rng);
 }
 
 /** Moves asteroids, resolves impacts, and awards dodges and near misses. */
@@ -173,12 +199,17 @@ function advanceHazards(world: World, dt: number, events: SimEventSink): void {
     a.y += a.vy * dt;
     a.rot += a.rotSpeed * dt;
 
+    if (a.ghost) {
+      retireIfGone(a);
+      return;
+    }
+
     if (ship.alive) {
       if (ship.shieldTime > 0) {
         if (circlesOverlap(ship, a)) {
           // The shield bubble vaporises anything it touches.
           ship.shieldTime = 0;
-          a.alive = false;
+          a.ghost = true;
           emitBurst(world.particles, world.fxRng, a.x, a.y, 30, [PALETTE.shield, PALETTE.asteroid]);
           events.emit({ type: 'shieldBreak', x: a.x, y: a.y, r: a.r, skin: a.skin });
           return;
@@ -194,7 +225,7 @@ function advanceHazards(world: World, dt: number, events: SimEventSink): void {
         );
         if (toi !== null) {
           resolveImpact(world, a, events);
-          a.alive = false;
+          a.ghost = true;
           return;
         }
       }
@@ -211,13 +242,17 @@ function advanceHazards(world: World, dt: number, events: SimEventSink): void {
       }
     }
 
-    // Retire once well outside the field on any side.
-    if (a.y - a.r > WORLD.height + 40 || a.x < -120 || a.x > WORLD.width + 120) {
-      a.alive = false;
-    }
+    retireIfGone(a);
   });
 
   world.asteroids.compact();
+}
+
+/** Retires a rock once it is well outside the field on any side. */
+function retireIfGone(a: Asteroid): void {
+  if (a.y - a.r > WORLD.height + 40 || a.x < -120 || a.x > WORLD.width + 120) {
+    a.alive = false;
+  }
 }
 
 /**

@@ -27,6 +27,17 @@ Canvas 2D · zero runtime dependencies
 - **Comets are fast, and always telegraphed.** A red lane lights up first, then
   a comet comes straight down it. Speed with a clear warning is a test of
   attention rather than a cheap death.
+- **A daily run.** One seed per UTC day, the same field for everyone, always at
+  normal difficulty. Your best attempt of the day counts, playing on consecutive
+  days builds a streak, and **Share** puts a spoiler-free result on the
+  clipboard, or in the share sheet on a phone:
+
+  ```
+  Dodge Asteroid · Daily #12
+  🟦🟧🟨🟩⬛⬛
+  3,840 pts · ×11 combo · 3 tries
+  ```
+
 - **Six sectors.** Every 25 seconds the field crosses into a new named sector:
   the nebula shifts colour, most rocks take that sector's colour family, and a
   banner says where you are. Past the sixth, the run cycles into "Deep" sectors.
@@ -96,10 +107,22 @@ shockwave, a hit-stop or an announcement. Tests assert on the events instead of
 on mocks, and every visual effect lives outside the simulation with its own
 random stream, so turning them all off cannot change a run.
 
-**What falls is decided by the seed alone.** Spawns draw from one random stream
-and cosmetic bursts from another, so collecting a pickup or a shard cannot
-reshuffle the rest of the field. A test flies two very different paths through
-the same seed and asserts the spawn sequences are identical.
+**What falls is decided by the seed alone**, which is what makes a daily run the
+same run for everyone. Three things keep the player out of it:
+
+- Spawns draw from one random stream and cosmetic bursts from another, so
+  collecting a pickup or a shard cannot reshuffle the field.
+- A rock the player destroys becomes a _ghost_: invisible and harmless, but
+  still counted by the spawner's crowding check until it would have left. A
+  test smashes through dozens of rocks with a permanent shield and asserts the
+  field is bit-for-bit the one a player sitting in a corner sees, on three
+  seeds; with ghosts removed, it fails.
+- Spawns, difficulty and sectors run on _field time_, which slow-mo slows, and a
+  spawn keeps to its schedule rather than to whichever tick noticed it.
+
+Slow-mo is the one honest exception: it changes the size of the field's ticks,
+so from the moment a player takes it their field is the same difficulty at the
+same rate, but no longer rock-for-rock. A test pins that down too.
 
 **The loop is testable.** A fixed-timestep accumulator with an injectable clock
 means physics runs in constant steps at any refresh rate, and the loop can be
@@ -134,7 +157,7 @@ intensity)` decides the arrangement and is unit-tested; a small scheduler
 ## Testing
 
 The simulation is a pure function of its seed, its input and its timestep, and
-that is what the tests cover: **206 unit tests** across the difficulty curve,
+that is what the tests cover: **230 unit tests** across the difficulty curve,
 collision (including the tunnelling case), scoring and near-miss timing, comets
 and their warnings, shards and their pull, sectors, spawning, the state machine,
 the loop, the object pool, persistence, the music arrangement, and a
@@ -146,8 +169,9 @@ when the visuals improve. Those are covered by **Playwright specs that drive the
 real built game** in Chromium and on an emulated phone: that the ship follows
 the mouse and the keyboard, that pausing genuinely freezes the world, that a
 crash plays out before a run ends on an in-page screen that explains the score,
-that the best score and the sound and music settings survive a reload, and that
-a tap steers on a touch screen.
+that the best score and the sound and music settings survive a reload, that a
+daily run is the same seed on every attempt and its result can be shared, and
+that a tap steers on a touch screen.
 
 ```bash
 npm run typecheck   # tsc --noEmit
@@ -180,6 +204,20 @@ npm run media    # screenshots, the demo GIF, the store cards and public/og.jpg
 npm run decks    # the two slide decks in docs/decks/
 ```
 
+## Usage counts
+
+Off by default. To see how many people play, and how far they get:
+
+1. Create a free site at [GoatCounter](https://www.goatcounter.com). It sets no
+   cookies and stores nothing personal, so there is no consent banner to add.
+2. In the repository, add an Actions _variable_ (not a secret) named
+   `GOATCOUNTER_CODE`, set to the site's code: `mygame` for
+   `mygame.goatcounter.com`.
+
+The next deploy counts page views plus `run/start/daily`,
+`run/end/endless/sector-3`, `share/daily` and similar events. With the variable
+unset, no script is loaded at all.
+
 ## Decks
 
 Two slide decks live in [`docs/decks/`](docs/decks), both generated from
@@ -206,7 +244,7 @@ to avoid:
 | The ship rendered a full body-width away from the cursor                                                                                                                       | One tested coordinate mapping                                       |
 | Mouse only, with no viewport meta tag, so it could not be played on a phone                                                                                                    | Mouse, touch and keyboard                                           |
 | 86 KB of vendored jQuery carrying three CVEs                                                                                                                                   | No runtime dependencies                                             |
-| No tests, no CI, no licence                                                                                                                                                    | 206 unit tests, 17 e2e specs, CI on every push                      |
+| No tests, no CI, no licence                                                                                                                                                    | 230 unit tests, 19 e2e specs, CI on every push                      |
 
 ## Licence
 

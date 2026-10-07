@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SimEvent } from './events.js';
+import type { SteerInput } from './movement.js';
 import type { World } from './world.js';
 import { COMETS, DIFFICULTY, SECTORS, SHARDS, SHIP, WORLD } from '../config.js';
 import { createEventBuffer } from './events.js';
@@ -116,7 +117,9 @@ describe('update', () => {
       expect(world.powerUps.active).toBeLessThanOrEqual(world.powerUps.capacity);
       // One over the cap is possible for a single tick, since the limit is
       // checked before the spawn rather than after it.
-      expect(world.asteroids.active).toBeLessThanOrEqual(difficultyAt(world.elapsed).maxActive + 1);
+      expect(world.asteroids.active).toBeLessThanOrEqual(
+        difficultyAt(world.fieldTime).maxActive + 1,
+      );
       if (!alive) break;
     }
   });
@@ -327,7 +330,7 @@ describe('comets', () => {
     const world = createWorld(2);
     const buffer = createEventBuffer();
     // Late enough in the ramp that comets are in the mix.
-    world.elapsed = 200;
+    world.fieldTime = 200;
     world.ship.invulnTime = 1e9;
 
     let warnings = 0;
@@ -466,33 +469,113 @@ describe('after the ship is destroyed', () => {
   });
 });
 
-describe('the spawn stream', () => {
-  // What falls is decided by the seed alone. Collecting a pickup or a shard
-  // draws from a separate cosmetic stream, so it cannot reshuffle the field.
-  it('does not depend on what the player collects', () => {
-    const spawnsFor = (steer: (tick: number) => ReturnType<typeof steerAt>): string[] => {
-      const world = createWorld(2718);
-      const buffer = createEventBuffer();
-      world.ship.invulnTime = 1e9;
-      const log: string[] = [];
-      let scheduled = world.nextSpawnAtMs;
-      for (let i = 0; i < 60 * 45; i += 1) {
-        update(world, DT, { steer: steer(i), canSteer: true }, buffer);
-        buffer.drain();
-        if (world.nextSpawnAtMs === scheduled) continue;
-        scheduled = world.nextSpawnAtMs;
-        // The pool keeps spawn order, so the newest arrival is the last one.
-        let newest = '';
-        world.asteroids.forEach((a) => (newest = `${a.x.toFixed(3)}:${String(a.skin)}`));
-        log.push(`${scheduled.toFixed(3)}@${newest}`);
-      }
-      return log;
-    };
+describe('the field', () => {
+  interface Spawn {
+    /** What spawned, which must match exactly. */
+    what: string;
+    /** When, in field time. Slow-mo can shift this by up to one tick. */
+    atMs: number;
+  }
 
-    const sweeping = spawnsFor(steerAt);
-    const parked = spawnsFor(() => ({ target: { x: 40, y: 700 }, axis: { x: 0, y: 0 } }));
-    expect(sweeping.length).toBeGreaterThan(20);
-    expect(parked).toEqual(sweeping);
+  /**
+   * Plays a run to a fixed point in field time and logs every spawn.
+   * `act` gets each tick to do whatever a player might.
+   */
+  function fieldFor(
+    seed: number,
+    act: (world: World, tick: number) => SteerInput,
+    seconds = 70,
+  ): {
+    spawns: Spawn[];
+    events: SimEvent[];
+  } {
+    const world = createWorld(seed);
+    const buffer = createEventBuffer();
+    const spawns: Spawn[] = [];
+    const events: SimEvent[] = [];
+    let scheduled = world.nextSpawnAtMs;
+
+    for (let tick = 0; world.fieldTime < seconds; tick += 1) {
+      // Never let the run end, so both players see the whole stretch.
+      world.ship.lives = 99;
+      update(world, DT, { steer: act(world, tick), canSteer: true }, buffer);
+      events.push(...buffer.drain());
+      if (world.nextSpawnAtMs === scheduled) continue;
+      scheduled = world.nextSpawnAtMs;
+      // The pool keeps spawn order, so the newest arrival is the last one.
+      let what = '';
+      world.asteroids.forEach((a) => {
+        what = [
+          a.px.toFixed(4),
+          a.r.toFixed(4),
+          a.vy.toFixed(4),
+          String(a.skin),
+          String(a.comet),
+        ].join(':');
+      });
+      spawns.push({ what, atMs: world.fieldMs });
+    }
+    return { spawns, events };
+  }
+
+  const idleField = (): ReturnType<typeof fieldFor> =>
+    fieldFor(2718, () => ({ target: { x: 40, y: 700 }, axis: { x: 0, y: 0 } }));
+
+  // What falls is decided by the seed alone. A player who smashes through
+  // rocks must see exactly the field that a player sitting in a corner sees,
+  // or a daily run is not the same run.
+  it.each([2718, 1, 99])(
+    'is identical however many rocks the player destroys (seed %i)',
+    (seed) => {
+      // A shield kept up the whole time vaporises every rock the sweep touches.
+      // Slow-mo is the one pickup that does bend the field, and has its own
+      // test below, so it is cancelled for both players here.
+      const busy = fieldFor(
+        seed,
+        (world, tick) => {
+          world.ship.shieldTime = 6;
+          world.ship.slowmoTime = 0;
+          return steerAt(tick);
+        },
+        120,
+      );
+      const idle = fieldFor(
+        seed,
+        (world) => {
+          world.ship.slowmoTime = 0;
+          return { target: { x: 40, y: 700 }, axis: { x: 0, y: 0 } };
+        },
+        120,
+      );
+
+      // The busy player really did change things.
+      expect(busy.events.filter((e) => e.type === 'shieldBreak').length).toBeGreaterThan(8);
+      expect(busy.spawns).toEqual(idle.spawns);
+    },
+  );
+
+  // Slow-mo dilates field time for the player who takes it. Up to that moment
+  // the field is identical; after it, it is the same difficulty at the same
+  // rate, but no longer rock-for-rock, because spawns land on ticks of a
+  // different size.
+  it('is identical until slow-mo, and just as busy after it', () => {
+    const slowFrom = 30;
+    let slowed = false;
+    const busy = fieldFor(2718, (world, tick) => {
+      if (!slowed && world.fieldTime > slowFrom) {
+        world.ship.slowmoTime = 5;
+        slowed = true;
+      }
+      return steerAt(tick);
+    });
+    const idle = idleField();
+
+    const before = (log: Spawn[]): Spawn[] => log.filter((s) => s.atMs < slowFrom * 1000);
+    expect(before(busy.spawns).length).toBeGreaterThanOrEqual(25);
+    expect(before(busy.spawns)).toEqual(before(idle.spawns));
+
+    const after = (log: Spawn[]): number => log.length - before(log).length;
+    expect(Math.abs(after(busy.spawns) - after(idle.spawns))).toBeLessThanOrEqual(2);
   });
 });
 
@@ -501,7 +584,7 @@ describe('the field after a crash', () => {
     const world = createWorld(404);
     const buffer = createEventBuffer();
     // Deep enough into the ramp that the field is busy and comets are live.
-    world.elapsed = 90;
+    world.fieldTime = 90;
     for (let i = 0; i < 600 && world.ship.alive; i += 1) {
       update(world, DT, PARKED, buffer);
       buffer.drain();

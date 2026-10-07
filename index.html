@@ -61,6 +61,7 @@
               <span class="hud__value" id="hud-score">0</span>
             </div>
             <div class="hud__group hud__group--center">
+              <span class="hud__mode" id="hud-mode" hidden></span>
               <span class="hud__combo" id="hud-combo"></span>
               <span class="hud__status" id="hud-status"></span>
             </div>
@@ -87,6 +88,14 @@
 
               <button class="cta" id="play-button" type="button" data-autofocus>
                 <span class="cta__label">Play</span>
+              </button>
+
+              <!-- One seed per UTC day: the same field for everyone. -->
+              <button class="daily-card" id="daily-button" type="button">
+                <span class="daily-card__title"
+                  >Daily run <span class="daily-card__number" id="daily-number"></span
+                ></span>
+                <span class="daily-card__meta" id="daily-meta"></span>
               </button>
 
               <div class="home-actions">
@@ -122,13 +131,16 @@
                 <span class="screen__meta" id="final-meta"></span>
               </p>
               <p class="screen__best" id="best-banner" hidden>New personal best</p>
+              <p class="screen__daily" id="daily-result" hidden></p>
               <dl class="run-stats" id="run-stats"></dl>
               <div class="screen__actions">
                 <button class="cta cta--compact" id="again-button" type="button" data-autofocus>
                   <span class="cta__label">Play again</span>
                 </button>
+                <button class="button" id="share-button" type="button">Share</button>
                 <button class="button" id="menu-button" type="button">Main menu</button>
               </div>
+              <p class="screen__share-status" id="share-status" role="status"></p>
               <div class="leaderboard" id="gameover-leaderboard"></div>
             </section>
 
@@ -304,6 +316,9 @@
               </ul>
               <p class="guide__footnote">
                 Every 25 seconds you cross into a new sector, and the field changes colour with it.
+                The <strong>daily run</strong> is the same field for everyone each day, always at
+                normal difficulty: your best attempt counts, and playing on consecutive days builds
+                a streak.
               </p>
               <div class="screen__actions">
                 <button class="button button--primary" id="guide-back" type="button" data-autofocus>
@@ -331,6 +346,10 @@
                   <strong>Controls</strong> — move with the mouse, touch, arrow keys or
                   <kbd>WASD</kbd>. <kbd>P</kbd> or <kbd>Esc</kbd> pauses, <kbd>R</kbd> restarts,
                   <kbd>M</kbd> mutes.
+                </p>
+                <p id="analytics-note" hidden>
+                  Anonymous visit and run counts are kept with GoatCounter, which sets no cookies
+                  and stores nothing personal.
                 </p>
                 <p>
                   Built by

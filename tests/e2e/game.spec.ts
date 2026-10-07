@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 
 interface DebugSnapshot {
   phase: string;
+  mode: string;
   score: number;
   elapsed: number;
   lives: number;
@@ -50,6 +51,11 @@ async function crashTheShip(page: Page): Promise<void> {
 /** Waits until the game leaves the countdown and is actually simulating. */
 async function startRun(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(async () => (await snapshot(page)).phase, { timeout: 15_000 }).toBe('playing');
+}
+
+async function startDaily(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /Daily run/ }).click();
   await expect.poll(async () => (await snapshot(page)).phase, { timeout: 15_000 }).toBe('playing');
 }
 
@@ -258,6 +264,57 @@ test('settings persist the sound preference', async ({ page }) => {
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.__dodge !== undefined)).toBe(true);
   await expect(page.locator('#mute-state')).toHaveText('off');
+});
+
+test.describe('daily run', () => {
+  test('is the same field on every attempt today, and unlike an endless run', async ({ page }) => {
+    await startDaily(page);
+    const first = await snapshot(page);
+    expect(first.mode).toBe('daily');
+    await expect(page.locator('#hud-mode')).toHaveText(/Daily #\d+/);
+
+    await page.keyboard.press('KeyP');
+    await page.getByRole('button', { name: 'Main menu' }).click();
+    await startDaily(page);
+    expect((await snapshot(page)).seed).toBe(first.seed);
+
+    await page.keyboard.press('KeyP');
+    await page.getByRole('button', { name: 'Main menu' }).click();
+    await startRun(page);
+    const endless = await snapshot(page);
+    expect(endless.mode).toBe('endless');
+    expect(endless.seed).not.toBe(first.seed);
+    await expect(page.locator('#hud-mode')).toBeHidden();
+  });
+
+  test("records the attempt and shares the day's best", async ({ page, context }) => {
+    // Force the clipboard path: a headless share sheet has nobody to answer it.
+    await page.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, 'share', { value: undefined });
+    });
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => window.__dodge !== undefined)).toBe(true);
+
+    await startDaily(page);
+    await crashTheShip(page);
+
+    await expect(page.locator('#daily-result')).toContainText(
+      /Daily #\d+ · best today [\d,]+ · 1 try/,
+    );
+
+    await page.getByRole('button', { name: 'Share' }).click();
+    await expect(page.locator('#share-status')).toHaveText('Copied to the clipboard.');
+    const shared = await page.evaluate(() => navigator.clipboard.readText());
+    expect(shared).toMatch(/^Dodge Asteroid · Daily #\d+\n/);
+    expect(shared).toContain('1 try');
+    expect(shared).toContain('https://mattathiasa.github.io/Dodge-Asteroid/');
+
+    // The menu remembers today's result and starts the streak.
+    await page.getByRole('button', { name: 'Main menu' }).click();
+    await expect(page.locator('#daily-meta')).toContainText('1 try');
+    await expect(page.locator('#daily-meta')).toContainText('1-day streak');
+  });
 });
 
 test.describe('touch', () => {

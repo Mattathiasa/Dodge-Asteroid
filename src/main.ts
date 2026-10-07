@@ -34,8 +34,6 @@ const COUNTDOWN_SECONDS = 3;
 const SECTOR_BANNER_MS = 2600;
 /** The title screen drifts through the sector colours, a preview of the run. */
 const MENU_SECTOR_SECONDS = 7;
-const AMBER = '#ffd35c';
-const CREAM = '#fff3dc';
 
 /**
  * Read-only snapshot of the running game.
@@ -340,8 +338,8 @@ function start(): void {
           event.combo > 1
             ? `+${String(event.points)} ×${String(event.combo)}`
             : `+${String(event.points)}`;
-        fx.floater(event.x, event.y - 12, label, AMBER, 13 + Math.min(event.combo, 8));
-        fx.ring(ship.x, ship.y, ship.r + 4, ship.r + 30, AMBER, 0.32, 2.5);
+        fx.floater(event.x, event.y - 12, label, PALETTE.combo, 13 + Math.min(event.combo, 8));
+        fx.ring(ship.x, ship.y, ship.r + 4, ship.r + 30, PALETTE.combo, 0.32, 2.5);
         break;
       }
       case 'shard':
@@ -386,9 +384,9 @@ function start(): void {
         addTrauma(camera, CAMERA.traumaOnHit);
         hitStop = FEEL.hitStopOnDestroyed;
         fx.debris(event.x, event.y, Math.max(event.r, 18), event.skin, 14);
-        fx.ring(event.x, event.y, 8, 120, CREAM, 0.7, 5);
+        fx.ring(event.x, event.y, 8, 120, PALETTE.bone, 0.7, 5);
         fx.ring(event.x, event.y, 4, 70, PALETTE.ship, 0.5, 3);
-        fx.flash(CREAM, 0.22);
+        fx.flash(PALETTE.bone, 0.22);
         break;
       case 'milestone':
         announcer.say(`${String(event.points)} points.`);

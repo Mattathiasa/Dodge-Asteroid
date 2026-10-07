@@ -211,28 +211,40 @@ export const SPAWN = {
   skinCount: 5,
 } as const;
 
-/** Named colours, so the palette can be changed in one edit. */
+/**
+ * Named colours, so the palette can be changed in one edit.
+ *
+ * "Deep sea": a dark teal field, bone panels, coral for action and a
+ * bioluminescent mint ship. Hazards stay in warm or saturated families, so
+ * nothing that can kill you shares a hue with the field or with the ship.
+ * The stylesheet's tokens mirror these, so the frame and the field match.
+ */
 export const PALETTE = {
-  background: '#0a0620',
-  backgroundGlow: '#241350',
-  starFar: '#463a86',
-  starMid: '#7d74c8',
-  starNear: '#cfd2ff',
-  ship: '#4ff0ff',
-  shipGlow: '#0affff',
-  shipTrail: '#2ad4ff',
-  shield: '#7dffc4',
-  asteroid: '#ff4fa3',
-  asteroidGlow: '#ff2d8a',
-  asteroidCore: '#3a0f2a',
-  powerShield: '#7dffc4',
-  powerSlowmo: '#ffd35c',
-  powerLife: '#ff7bd5',
+  background: '#04141c',
+  backgroundGlow: '#0b3442',
+  starFar: '#1d4752',
+  starMid: '#4d8c96',
+  starNear: '#d2f5ef',
+  /** Outlines and text on light surfaces. */
+  ink: '#0b1f26',
+  /** Light surfaces and text on dark ones. */
+  bone: '#f4efe6',
+  ship: '#7dffd8',
+  shipGlow: '#2effc0',
+  shipTrail: '#5cf2c9',
+  shipShade: '#12957a',
+  shipOutline: '#063a30',
+  shipCockpit: '#05282a',
+  shield: '#7cc8ff',
+  /** Sparks thrown off when a rock hits the ship. */
+  asteroid: '#ff6b4a',
+  powerShield: '#7cc8ff',
+  powerSlowmo: '#ffc94a',
+  powerLife: '#ff8ab3',
+  combo: '#ffc94a',
   shard: '#ffe7a3',
   shardCore: '#fffaf0',
-  comet: '#bff6ff',
-  danger: '#ff4f6d',
-  text: '#e8ecff',
+  danger: '#ff3d6e',
 } as const;
 
 export const STORAGE_KEY = 'dodge-asteroid:profile';

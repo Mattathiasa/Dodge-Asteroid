@@ -7,15 +7,17 @@ type Rgb = [number, number, number];
  * Nebula colours for each sector, in the same order as `SECTOR_TABLE`.
  *
  * Each pair tints the field toward that sector's rock colour family, so a new
- * sector is visible at a glance rather than only announced.
+ * sector is visible at a glance rather than only announced. They stay dark on
+ * purpose: most rocks in a sector share its hue, and a bright nebula would
+ * camouflage them.
  */
 const NEBULAE: readonly (readonly [string, string])[] = [
-  ['#3a1f7d', '#6d1b5e'],
-  ['#5c1f2f', '#9a3a12'],
-  ['#123a6b', '#1d6a86'],
-  ['#163d2a', '#4a6614'],
-  ['#2a1060', '#5b1f9a'],
-  ['#5e1046', '#9c1d68'],
+  ['#0c3d47', '#0f5753'],
+  ['#3d1a12', '#6b2c12'],
+  ['#0a2150', '#14407e'],
+  ['#0e2a19', '#24380f'],
+  ['#24104d', '#47207a'],
+  ['#360c22', '#521630'],
 ];
 
 interface Cloud {
@@ -44,7 +46,7 @@ function nebulaFor(sector: number): readonly [Rgb, Rgb] {
   const safe = Math.max(0, Math.floor(sector));
   // Past the table, cycle the coloured sectors the way `sectorInfo` names them.
   const index = safe < NEBULAE.length ? safe : 1 + ((safe - NEBULAE.length) % (NEBULAE.length - 1));
-  const pair = NEBULAE[index] ?? NEBULAE[0] ?? ['#3a1f7d', '#6d1b5e'];
+  const pair = NEBULAE[index] ?? NEBULAE[0] ?? [PALETTE.backgroundGlow, PALETTE.backgroundGlow];
   return [parse(pair[0]), parse(pair[1])];
 }
 
@@ -135,7 +137,7 @@ export class Backdrop {
     // Heat rising from the bottom of the field as the run intensifies.
     if (this.intensity > 0.02) {
       const heat = ctx.createLinearGradient(0, WORLD.height, 0, WORLD.height * 0.45);
-      heat.addColorStop(0, rgba(this.current[1], 0.38 * this.intensity));
+      heat.addColorStop(0, rgba(this.current[1], 0.28 * this.intensity));
       heat.addColorStop(1, rgba(this.current[1], 0));
       ctx.fillStyle = heat;
       ctx.fillRect(0, WORLD.height * 0.45, WORLD.width, WORLD.height * 0.55);

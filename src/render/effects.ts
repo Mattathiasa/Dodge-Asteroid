@@ -3,6 +3,7 @@ import { TAU, clamp01 } from '../core/math.js';
 import { Pool } from '../game/pool.js';
 import { createRng } from '../core/rng.js';
 import { METEOR_SKINS } from './meteors.js';
+import { PALETTE } from '../config.js';
 
 /** A short label that pops where something happened, then rises and fades. */
 interface Floater {
@@ -49,7 +50,6 @@ interface Chunk {
   c: number;
 }
 
-const INK = '#1b0b36';
 const FONT = "'Bungee', 'Outfit', system-ui, sans-serif";
 
 /**
@@ -284,7 +284,7 @@ export class Effects {
       ctx.globalAlpha = clamp01((f.life / f.maxLife) * 2.4);
       ctx.font = `${String(Math.round(f.size * pop))}px ${FONT}`;
       ctx.lineWidth = Math.max(3, f.size * 0.36);
-      ctx.strokeStyle = INK;
+      ctx.strokeStyle = PALETTE.ink;
       ctx.strokeText(f.text, f.x, f.y - rise);
       ctx.fillStyle = f.color;
       ctx.fillText(f.text, f.x, f.y - rise);

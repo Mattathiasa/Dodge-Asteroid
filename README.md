@@ -168,9 +168,9 @@ npm run build     # -> dist/
 npm run preview   # serve the production build
 ```
 
-`npm run build` produces about **31 KB of JavaScript, 11 KB gzipped**, with no
+`npm run build` produces about **57 KB of JavaScript, 20 KB gzipped**, with no
 runtime dependencies and no binary assets — the ship, the asteroids, the
-particles and every sound effect are generated at runtime.
+particles, every sound effect and the music are generated at runtime.
 
 To regenerate the media in this README:
 

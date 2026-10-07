@@ -25,25 +25,25 @@ const CARDS = [
     file: 's-play.png',
     line1: 'Thread the gap.',
     line2: 'Every near miss builds your combo.',
-    accent: '#8fcf2f',
+    accent: '#ffc94a',
   },
   {
     file: 's-home.png',
     line1: 'One tap to fly.',
     line2: 'Mouse, finger or keyboard.',
-    accent: '#f2792a',
+    accent: '#ff6b4a',
   },
   {
     file: 's-gameover.png',
     line1: 'Beat your best.',
     line2: 'See exactly where the points came from.',
-    accent: '#ff5fb4',
+    accent: '#ff8ab3',
   },
   {
     file: 's-settings.png',
     line1: 'Play it your way.',
     line2: 'Three difficulties, reduced motion, music and sound.',
-    accent: '#4ff0ff',
+    accent: '#7dffd8',
   },
 ];
 
@@ -124,16 +124,16 @@ const card = (c) => `<!doctype html><html><head><meta charset="utf-8">
 <style>
  *{box-sizing:border-box} html,body{margin:0}
  body{width:1242px;height:2208px;overflow:hidden;
-   background:radial-gradient(120% 60% at 50% 8%, #2d1861 0%, #170b3a 45%, #0a0620 100%);
+   background:radial-gradient(120% 60% at 50% 8%, #0f4452 0%, #072029 45%, #04141c 100%);
    font-family:'Outfit',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center}
  .cap{padding:130px 80px 0;text-align:center}
  /* A dark stroke would vanish against this background, so the headline gets
     its weight from size and a coloured baseline instead. */
- .l1{font-family:'Bungee',sans-serif;font-size:82px;line-height:1.22;color:#fff3dc;
+ .l1{font-family:'Bungee',sans-serif;font-size:82px;line-height:1.22;color:#f4efe6;
    text-shadow:0 8px 0 ${c.accent}, 0 22px 44px rgba(0,0,0,.65)}
- .l2{margin-top:40px;font-size:38px;font-weight:600;line-height:1.35;color:#c6b7e4}
- .shot{margin-top:86px;border:12px solid #1b0b36;border-radius:44px;overflow:hidden;
-   box-shadow:0 26px 0 #1b0b36, 0 60px 90px rgba(0,0,0,.6);width:920px}
+ .l2{margin-top:40px;font-size:38px;font-weight:600;line-height:1.35;color:#9cc4c8}
+ .shot{margin-top:86px;border:12px solid #0b1f26;border-radius:44px;overflow:hidden;
+   box-shadow:0 26px 0 #0b1f26, 0 60px 90px rgba(0,0,0,.6);width:920px}
  .shot img{display:block;width:100%}
 </style></head><body>
  <div class="cap"><div class="l1">${c.line1}</div><div class="l2">${c.line2}</div></div>

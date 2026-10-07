@@ -20,8 +20,6 @@ export interface Scene {
   readonly sector: number;
 }
 
-const INK = '#1b0b36';
-
 export class Renderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly starfield: Starfield;
@@ -148,11 +146,11 @@ export class Renderer {
       ctx.closePath();
       ctx.lineJoin = 'round';
       ctx.lineWidth = 5;
-      ctx.strokeStyle = INK;
+      ctx.strokeStyle = PALETTE.ink;
       ctx.stroke();
       ctx.fillStyle = PALETTE.danger;
       ctx.fill();
-      ctx.fillStyle = '#fff3dc';
+      ctx.fillStyle = PALETTE.bone;
       ctx.font = `${String(Math.round(size * 0.95))}px 'Bungee', 'Outfit', sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -196,7 +194,7 @@ export class Renderer {
       ctx.shadowBlur = 0;
       ctx.lineJoin = 'round';
       ctx.lineWidth = 1.6;
-      ctx.strokeStyle = INK;
+      ctx.strokeStyle = PALETTE.ink;
       ctx.stroke();
 
       // One facet in shadow gives it a cut edge.
@@ -241,8 +239,8 @@ export class Renderer {
     const cx = WORLD.width / 2;
     const cy = WORLD.height / 2;
     const tint = ctx.createRadialGradient(cx, cy, WORLD.height * 0.28, cx, cy, WORLD.height * 0.72);
-    tint.addColorStop(0, 'rgba(255, 211, 92, 0)');
-    tint.addColorStop(1, `rgba(255, 211, 92, ${strength.toFixed(3)})`);
+    tint.addColorStop(0, withAlpha(PALETTE.powerSlowmo, 0));
+    tint.addColorStop(1, withAlpha(PALETTE.powerSlowmo, strength));
     ctx.save();
     ctx.fillStyle = tint;
     ctx.fillRect(0, 0, WORLD.width, WORLD.height);
@@ -300,11 +298,11 @@ export class Renderer {
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      ctx.strokeStyle = '#0a1030';
+      ctx.strokeStyle = PALETTE.ink;
       ctx.lineWidth = Math.max(1, p.r * 0.13);
       ctx.stroke();
 
-      ctx.fillStyle = '#0a1030';
+      ctx.fillStyle = PALETTE.ink;
       drawPowerUpGlyph(ctx, p.kind, p.r);
 
       ctx.globalAlpha = 0.45;
@@ -368,14 +366,14 @@ export class Renderer {
     ctx.lineCap = 'round';
     ctx.lineWidth = 3;
     ctx.globalAlpha = 0.22;
-    ctx.strokeStyle = PALETTE.powerSlowmo;
+    ctx.strokeStyle = PALETTE.combo;
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, TAU);
     ctx.stroke();
 
     ctx.globalAlpha = 0.95;
     if (this.effects) {
-      ctx.shadowColor = PALETTE.powerSlowmo;
+      ctx.shadowColor = PALETTE.combo;
       ctx.shadowBlur = 8;
     }
     ctx.beginPath();
@@ -417,7 +415,7 @@ export class Renderer {
     const hull = ctx.createLinearGradient(0, -r * 1.3, 0, r);
     hull.addColorStop(0, '#ffffff');
     hull.addColorStop(0.45, PALETTE.ship);
-    hull.addColorStop(1, '#1478a8');
+    hull.addColorStop(1, PALETTE.shipShade);
 
     ctx.beginPath();
     ctx.moveTo(0, -r * 1.35);
@@ -431,18 +429,18 @@ export class Renderer {
     ctx.shadowBlur = 0;
 
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#06304a';
+    ctx.strokeStyle = PALETTE.shipOutline;
     ctx.lineWidth = Math.max(1, r * 0.13);
     ctx.stroke();
 
     // Cockpit.
-    ctx.fillStyle = '#0a2440';
+    ctx.fillStyle = PALETTE.shipCockpit;
     ctx.beginPath();
     ctx.ellipse(0, -r * 0.34, r * 0.3, r * 0.44, 0, 0, TAU);
     ctx.fill();
 
     ctx.globalAlpha = 0.6;
-    ctx.fillStyle = '#bff6ff';
+    ctx.fillStyle = '#e2fff7';
     ctx.beginPath();
     ctx.ellipse(-r * 0.09, -r * 0.46, r * 0.13, r * 0.2, -0.4, 0, TAU);
     ctx.fill();
@@ -525,6 +523,15 @@ export class Renderer {
     });
     ctx.restore();
   }
+}
+
+/** A #rrggbb colour at the given opacity. */
+function withAlpha(hex: string, alpha: number): string {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const r = (value >> 16) & 0xff;
+  const g = (value >> 8) & 0xff;
+  const b = value & 0xff;
+  return `rgba(${String(r)}, ${String(g)}, ${String(b)}, ${alpha.toFixed(3)})`;
 }
 
 /** Darkens a #rrggbb colour, for the shaded side of a glossy orb. */

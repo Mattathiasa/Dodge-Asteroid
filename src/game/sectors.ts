@@ -17,11 +17,11 @@ const FIRST: SectorInfo = { name: 'Outer Belt', skin: null };
  */
 export const SECTOR_TABLE: readonly SectorInfo[] = [
   FIRST,
-  { name: 'Ember Drift', skin: 0 },
-  { name: 'Glacier Reach', skin: 1 },
-  { name: 'Toxic Shoals', skin: 2 },
-  { name: 'Void Rift', skin: 3 },
-  { name: 'Rose Maelstrom', skin: 4 },
+  { name: 'Ember Vent', skin: 0 },
+  { name: 'Sunken Trench', skin: 1 },
+  { name: 'Kelp Shoals', skin: 2 },
+  { name: 'Violet Rift', skin: 3 },
+  { name: 'Coral Maelstrom', skin: 4 },
 ];
 
 /** Which sector a run is in, from difficulty-scaled seconds survived. */

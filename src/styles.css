@@ -2,40 +2,44 @@
    Dodge Asteroid — "sticker arcade"
 
    The meteors are drawn as glossy rocks with thick dark outlines, so the UI
-   chrome speaks the same language: ink outlines, warm cream panels, and hard
-   offset shadows that give controls real thickness. Cream on deep purple,
-   rather than yet more neon on black.
+   chrome speaks the same language: ink outlines, warm bone panels, and hard
+   offset shadows that give controls real thickness. The palette is "deep
+   sea": bone on abyssal teal, coral for anything you press, and a mint ship
+   that nothing dangerous shares a colour with.
 
    Canvas colours live in src/config.ts (PALETTE); these tokens mirror them so
    the DOM and the play field stay in step.
    ========================================================================== */
 
 :root {
-  --ink: #1b0b36;
-  --ink-soft: #6b4a86;
+  --ink: #0b1f26;
+  --ink-soft: #46666d;
 
-  --cream: #fff3dc;
-  --cream-2: #f6e6c8;
-  --cream-edge: #d9c6a4;
+  /* Bone. The names are kept from the first palette; the roles are the same. */
+  --cream: #f4efe6;
+  --cream-2: #e8e0d0;
+  --cream-edge: #c9bca4;
 
-  --space-1: #241350;
-  --space-2: #150a35;
-  --space-3: #0a0620;
-  --space-text: #b6a7d6;
+  --space-1: #0b3442;
+  --space-2: #072029;
+  --space-3: #04141c;
+  --space-text: #8cb6ba;
 
-  --ember: #f2792a;
-  --ember-light: #ffc46b;
-  --ember-dark: #a8330d;
-  --ember-shade: #8f2f0b;
+  /* Coral: the colour of anything you press to play. */
+  --ember: #ff6b4a;
+  --ember-light: #ffa184;
+  --ember-dark: #b8381d;
+  --ember-shade: #8a2410;
 
-  --cyan: #4ff0ff;
-  --cyan-light: #9dfbff;
-  --cyan-shade: #10708a;
+  /* Mint, the ship's colour, for secondary actions. */
+  --cyan: #7dffd8;
+  --cyan-light: #c4fff0;
+  --cyan-shade: #138a6e;
 
-  --amber: #ffd35c;
-  --green: #7dffc4;
-  --rose: #ff5fb4;
-  --rose-dark: #b81a76;
+  --amber: #ffc94a;
+  --sky: #7cc8ff;
+  --rose: #ff8ab3;
+  --rose-dark: #b83a6a;
 
   --radius: 20px;
   --font: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -54,7 +58,7 @@ body {
 }
 
 body {
-  background: radial-gradient(110% 60% at 50% 0%, #1d0f45 0%, transparent 70%), var(--space-3);
+  background: radial-gradient(110% 60% at 50% 0%, #0b2f3a 0%, transparent 70%), var(--space-3);
   color: var(--cream);
   font-family: var(--font);
   overflow: hidden;
@@ -260,8 +264,8 @@ body[data-screen='guide'] .hud {
 
 .hud__group--right {
   padding: 6px 13px;
-  background: rgba(27, 11, 54, 0.62);
-  border: 2px solid rgba(255, 243, 220, 0.32);
+  background: rgba(11, 31, 38, 0.62);
+  border: 2px solid rgba(244, 239, 230, 0.32);
   border-radius: 999px;
   flex-direction: row;
   align-items: baseline;
@@ -301,7 +305,7 @@ body[data-screen='guide'] .hud {
   font-size: 0.9rem;
   padding: 5px 13px;
   color: var(--ink);
-  background: linear-gradient(180deg, var(--amber), #f2a72a);
+  background: linear-gradient(180deg, var(--amber), #f2a531);
   border: 3px solid var(--ink);
   border-radius: 999px;
   box-shadow: 0 3px 0 var(--ember-dark);
@@ -309,11 +313,12 @@ body[data-screen='guide'] .hud {
 }
 
 .hud__status {
+  white-space: nowrap;
   margin-top: 6px;
   padding: 4px 12px;
-  color: var(--green);
-  background: rgba(27, 11, 54, 0.72);
-  border: 2px solid var(--green);
+  color: var(--sky);
+  background: rgba(11, 31, 38, 0.72);
+  border: 2px solid var(--sky);
   border-radius: 999px;
 }
 
@@ -434,12 +439,12 @@ body[data-screen='guide'] .hud {
 
 .stage.has-overlay .overlays {
   pointer-events: auto;
-  background: rgba(10, 6, 32, 0.68);
+  background: rgba(4, 20, 28, 0.7);
 }
 
 /* The title screen shows the game behind it, so its scrim is much lighter. */
 body[data-screen='menu'] .stage.has-overlay .overlays {
-  background: linear-gradient(180deg, rgba(10, 6, 32, 0.34), rgba(10, 6, 32, 0.56));
+  background: linear-gradient(180deg, rgba(4, 20, 28, 0.34), rgba(4, 20, 28, 0.56));
 }
 
 .screen {
@@ -461,7 +466,7 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
 }
 
 .screen--home {
-  background: linear-gradient(180deg, rgba(36, 19, 80, 0.9), rgba(10, 6, 32, 0.93));
+  background: linear-gradient(180deg, rgba(11, 52, 66, 0.9), rgba(4, 20, 28, 0.93));
   border-color: var(--ink);
 }
 
@@ -514,7 +519,7 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink);
-  background: linear-gradient(180deg, var(--amber), #f2a72a);
+  background: linear-gradient(180deg, var(--amber), #f2a531);
   border: 3px solid var(--ink);
   border-radius: 999px;
   box-shadow: 0 3px 0 var(--ember-dark);
@@ -627,7 +632,7 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
   padding: 0;
   border: 3px solid var(--ink);
   border-radius: 22px;
-  background: linear-gradient(180deg, var(--ember-light) 0%, var(--ember) 55%, #dd5f14 100%);
+  background: linear-gradient(180deg, var(--ember-light) 0%, var(--ember) 55%, #e84a28 100%);
   box-shadow:
     0 8px 0 var(--ember-shade),
     0 16px 26px rgba(0, 0, 0, 0.45);
@@ -707,8 +712,8 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
 }
 
 .button--primary {
-  color: #06304a;
-  background: linear-gradient(180deg, var(--cyan-light) 0%, var(--cyan) 55%, #22c3e0 100%);
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--cyan-light) 0%, var(--cyan) 55%, #3fe0b8 100%);
   box-shadow: 0 6px 0 var(--cyan-shade);
   font-family: var(--font-display);
   font-weight: 400;
@@ -717,7 +722,7 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
 }
 
 .button--primary:hover {
-  background: linear-gradient(180deg, #b6fdff 0%, var(--cyan) 55%, #29cfe8 100%);
+  background: linear-gradient(180deg, #ddfff6 0%, var(--cyan) 55%, #4ae8c2 100%);
 }
 
 .button--primary:active {
@@ -785,8 +790,8 @@ input[type='checkbox'] {
   gap: 20px;
   margin: 18px 0 0;
   padding: 13px 0;
-  border-top: 2px dashed rgba(255, 243, 220, 0.25);
-  border-bottom: 2px dashed rgba(255, 243, 220, 0.25);
+  border-top: 2px dashed rgba(244, 239, 230, 0.25);
+  border-bottom: 2px dashed rgba(244, 239, 230, 0.25);
 }
 
 .screen:not(.screen--home) .stats {
@@ -860,23 +865,23 @@ input[type='checkbox'] {
 }
 
 .leaderboard__item:first-child {
-  background: linear-gradient(90deg, #ffe6a8, #ffd889);
+  background: linear-gradient(90deg, #ffe7ad, #ffd679);
   border-color: var(--ink);
 }
 
 .screen--home .leaderboard__item {
-  background: rgba(255, 243, 220, 0.09);
-  border-color: rgba(255, 243, 220, 0.22);
+  background: rgba(244, 239, 230, 0.09);
+  border-color: rgba(244, 239, 230, 0.22);
 }
 
 .screen--home .leaderboard__item:first-child {
-  background: rgba(255, 211, 92, 0.18);
-  border-color: rgba(255, 211, 92, 0.55);
+  background: rgba(255, 201, 74, 0.18);
+  border-color: rgba(255, 201, 74, 0.55);
 }
 
 /* The run that just finished, wherever it landed. */
 .leaderboard__item.is-current {
-  background: linear-gradient(90deg, #c9fbff, var(--cyan-light));
+  background: linear-gradient(90deg, #e2fff8, var(--cyan-light));
   border-color: var(--ink);
   box-shadow: 0 3px 0 var(--ink);
 }

@@ -13,6 +13,8 @@ export interface Profile {
   readonly bestTimeSeconds: number;
   readonly runs: number;
   readonly muted: boolean;
+  /** Music is separate from sound effects; plenty of people want one without the other. */
+  readonly music: boolean;
   /** `null` follows the operating system setting. */
   readonly reducedMotion: boolean | null;
   readonly leaderboard: readonly ScoreEntry[];
@@ -26,6 +28,7 @@ export const DEFAULT_PROFILE: Profile = {
   bestTimeSeconds: 0,
   runs: 0,
   muted: false,
+  music: true,
   reducedMotion: null,
   leaderboard: [],
 };
@@ -73,6 +76,8 @@ export function migrate(raw: unknown): Profile {
         : 0,
     runs: toCount(raw['runs']),
     muted: raw['muted'] === true,
+    // Profiles saved before music existed have no opinion, so default to on.
+    music: raw['music'] !== false,
     reducedMotion: typeof reducedMotion === 'boolean' ? reducedMotion : null,
     leaderboard: toEntries(raw['leaderboard']),
   };
@@ -113,9 +118,19 @@ export function saveProfile(profile: Profile, store?: Storage): void {
   }
 }
 
-/** Folds a finished run into the profile, returning the updated copy. */
-export function recordRun(profile: Profile, score: number, timeSeconds: number): Profile {
-  const entry: ScoreEntry = { score, timeSeconds, at: Date.now() };
+/**
+ * Folds a finished run into the profile, returning the updated copy.
+ *
+ * `at` identifies the run's leaderboard entry, so the caller can find and
+ * highlight it.
+ */
+export function recordRun(
+  profile: Profile,
+  score: number,
+  timeSeconds: number,
+  at: number = Date.now(),
+): Profile {
+  const entry: ScoreEntry = { score, timeSeconds, at };
   const leaderboard = [...profile.leaderboard, entry]
     .sort((a, b) => b.score - a.score)
     .slice(0, LEADERBOARD_SIZE);

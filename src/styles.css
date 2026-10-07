@@ -54,7 +54,7 @@ body {
 }
 
 body {
-  background: var(--space-3);
+  background: radial-gradient(110% 60% at 50% 0%, #1d0f45 0%, transparent 70%), var(--space-3);
   color: var(--cream);
   font-family: var(--font);
   overflow: hidden;
@@ -200,7 +200,8 @@ body[data-screen='menu'] .topbar__title {
 
 body[data-screen='menu'] .hud,
 body[data-screen='settings'] .hud,
-body[data-screen='about'] .hud {
+body[data-screen='about'] .hud,
+body[data-screen='guide'] .hud {
   opacity: 0;
 }
 
@@ -295,6 +296,7 @@ body[data-screen='about'] .hud {
 }
 
 .hud__combo {
+  white-space: nowrap;
   font-family: var(--font-display);
   font-size: 0.9rem;
   padding: 5px 13px;
@@ -320,6 +322,68 @@ body[data-screen='about'] .hud {
   opacity: 1;
 }
 
+/* Each step of a combo knocks the chip, so it is felt as well as read. */
+.hud__combo.is-bump {
+  animation: combo-bump 260ms cubic-bezier(0.2, 1.8, 0.4, 1);
+}
+
+@keyframes combo-bump {
+  from {
+    transform: rotate(-3deg) scale(1.35);
+  }
+  to {
+    transform: rotate(-3deg) scale(1);
+  }
+}
+
+/* ---------- sector banner ---------- */
+
+.sector-banner {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -14px) scale(0.92);
+  transition:
+    opacity 280ms ease,
+    transform 360ms cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.sector-banner.is-showing {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.sector-banner__kicker {
+  padding: 3px 12px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--amber);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.sector-banner__name {
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 6vw, 2.1rem);
+  line-height: 1.1;
+  color: var(--cream);
+  -webkit-text-stroke: 7px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--rose);
+}
+
 /* ---------- countdown ---------- */
 
 .countdown {
@@ -338,6 +402,23 @@ body[data-screen='about'] .hud {
 
 .countdown.is-active {
   opacity: 1;
+}
+
+.countdown.is-pop {
+  animation: countdown-pop 620ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes countdown-pop {
+  0% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* ---------- overlays ---------- */
@@ -437,6 +518,55 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
   border: 3px solid var(--ink);
   border-radius: 999px;
   box-shadow: 0 3px 0 var(--ember-dark);
+}
+
+.screen__best--rank {
+  color: var(--ink);
+  background: var(--cream-2);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+/* ---------- run summary ---------- */
+
+.run-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.run-stats__item {
+  padding: 8px 11px 9px;
+  text-align: left;
+  background: var(--cream-2);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+}
+
+.run-stats dt {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.run-stats dd {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.run-stats small {
+  display: block;
+  overflow: hidden;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-soft);
 }
 
 .screen__actions {
@@ -543,6 +673,7 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
 
 .home-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
   margin-top: 14px;
@@ -743,6 +874,13 @@ input[type='checkbox'] {
   border-color: rgba(255, 211, 92, 0.55);
 }
 
+/* The run that just finished, wherever it landed. */
+.leaderboard__item.is-current {
+  background: linear-gradient(90deg, #c9fbff, var(--cyan-light));
+  border-color: var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
 .leaderboard__item::before {
   content: counter(rank);
   font-family: var(--font-display);
@@ -772,6 +910,57 @@ input[type='checkbox'] {
 
 .screen--home .leaderboard__time {
   color: var(--space-text);
+}
+
+/* ---------- how to play ---------- */
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.guide__item {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 8px 8px;
+  background: var(--cream-2);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+}
+
+/* Icons sit on a scrap of the play field, so they look as they do in game. */
+.guide__icon {
+  width: 44px;
+  height: 44px;
+  padding: 2px;
+  background: var(--space-2);
+  border: 2px solid var(--ink);
+  border-radius: 11px;
+}
+
+.guide__item p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.guide__item strong {
+  color: var(--ink);
+}
+
+.guide__footnote {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
 }
 
 /* ---------- prose ---------- */
@@ -830,6 +1019,26 @@ kbd {
   .screen {
     padding: 18px 16px 16px;
   }
+}
+
+@media (max-width: 420px) {
+  .pill {
+    min-height: 42px;
+    padding: 9px 13px;
+    font-size: 0.84rem;
+  }
+}
+
+/* The in-game "reduce motion" setting, for players whose OS does not say so. */
+body[data-motion='reduced'] .sector-banner,
+body[data-motion='reduced'] .sector-banner.is-showing {
+  transform: translate(-50%, 0);
+  transition: opacity 120ms linear;
+}
+
+body[data-motion='reduced'] .countdown.is-pop,
+body[data-motion='reduced'] .hud__combo.is-bump {
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

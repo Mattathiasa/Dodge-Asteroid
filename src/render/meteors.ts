@@ -83,6 +83,20 @@ export const METEOR_SKINS: readonly MeteorSkin[] = [
     trailCool: '#ff4fb5',
     glow: '#ff6ec2',
   },
+  // Comets only. White-hot with a tail in the warning-lane red, so the thing
+  // that falls is visibly the thing the lane warned about.
+  {
+    name: 'comet',
+    bodyLight: '#ffffff',
+    bodyMid: '#ffe6dc',
+    bodyDark: '#ff7a8c',
+    outline: '#4e0718',
+    crater: '#ffb3bd',
+    craterLip: '#ffffff',
+    trailHot: '#fff3dc',
+    trailCool: '#ff4f6d',
+    glow: '#ff8fa0',
+  },
 ] as const;
 
 interface Crater {
@@ -198,6 +212,8 @@ export interface MeteorDrawOptions {
   /** Animates the flame. */
   readonly time: number;
   readonly effects: boolean;
+  /** Multiplies the tail length; comets burn longer. */
+  readonly tailScale?: number;
 }
 
 export function drawMeteor(ctx: CanvasRenderingContext2D, o: MeteorDrawOptions): void {
@@ -206,7 +222,7 @@ export function drawMeteor(ctx: CanvasRenderingContext2D, o: MeteorDrawOptions):
   if (skin === undefined || silhouette === undefined) return;
 
   const flicker = 1 + Math.sin(o.time * 14 + o.shape * 2.1) * 0.12;
-  const tailLength = o.r * (3.6 + o.speedRatio * 5.2) * flicker;
+  const tailLength = o.r * (3.6 + o.speedRatio * 5.2) * flicker * (o.tailScale ?? 1);
 
   ctx.save();
   ctx.translate(o.x, o.y);

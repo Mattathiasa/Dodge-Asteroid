@@ -48,10 +48,17 @@ export class Hud {
     }
 
     if (score.combo !== this.lastCombo) {
+      const grew = score.combo > this.lastCombo && this.lastCombo >= 0;
       this.lastCombo = score.combo;
       const active = score.combo > 1;
       elements.combo.textContent = active ? `${String(score.combo)}× combo` : '';
       elements.combo.classList.toggle('is-active', active);
+      if (active && grew) {
+        // Restart the bump animation for each new step.
+        elements.combo.classList.remove('is-bump');
+        void elements.combo.offsetWidth;
+        elements.combo.classList.add('is-bump');
+      }
     }
 
     const status = describeStatus(world);

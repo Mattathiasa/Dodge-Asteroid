@@ -1,6 +1,6 @@
 import type { Phase } from '../game/phase.js';
 
-export type ScreenName = 'menu' | 'paused' | 'gameOver' | 'about' | 'settings';
+export type ScreenName = 'menu' | 'paused' | 'gameOver' | 'about' | 'settings' | 'guide';
 
 /**
  * Show/hide for the DOM screens layered over the canvas.
@@ -34,9 +34,12 @@ export class OverlayManager {
     this.root.classList.add('has-overlay');
     document.body.dataset['screen'] = name;
 
-    // Move focus into the screen so keyboard and screen-reader users land there.
-    const focusTarget = this.screens[name].querySelector<HTMLElement>('[data-autofocus]');
-    focusTarget?.focus();
+    // Move focus into the screen so keyboard and screen-reader users land there,
+    // without scrolling a tall screen down to wherever its button happens to be.
+    const screen = this.screens[name];
+    screen.scrollTop = 0;
+    const focusTarget = screen.querySelector<HTMLElement>('[data-autofocus]');
+    focusTarget?.focus({ preventScroll: true });
   }
 
   hide(): void {
@@ -66,6 +69,7 @@ export class OverlayManager {
         return 'gameOver';
       case 'playing':
       case 'countdown':
+      case 'dying':
         return null;
     }
   }

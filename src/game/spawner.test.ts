@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { WORLD } from '../config.js';
+import { COMETS, SECTORS, SHARDS, WORLD } from '../config.js';
 import { createRng } from '../core/rng.js';
 import { difficultyAt } from './difficulty.js';
-import { makeAsteroidSpec, maybeMakePowerUpSpec, nextSpawnTime, shouldSpawn } from './spawner.js';
+import {
+  makeAsteroidSpec,
+  makeCometSpec,
+  makeHazardSpec,
+  makeShardString,
+  maybeMakePowerUpSpec,
+  nextSpawnTime,
+  shouldSpawn,
+} from './spawner.js';
 
 describe('shouldSpawn', () => {
   const difficulty = difficultyAt(30);
@@ -97,5 +105,105 @@ describe('maybeMakePowerUpSpec', () => {
       if (spec !== null) kinds.add(spec.kind);
     }
     expect([...kinds].sort()).toEqual(['life', 'shield', 'slowmo']);
+  });
+});
+
+describe('makeAsteroidSpec sector bias', () => {
+  it('leans toward the sector colour without making the field monochrome', () => {
+    const rng = createRng(808);
+    const difficulty = difficultyAt(40);
+    const trials = 6000;
+    let matching = 0;
+    const seen = new Set<number>();
+    for (let i = 0; i < trials; i += 1) {
+      const spec = makeAsteroidSpec(difficulty, rng, WORLD.width, 3);
+      seen.add(spec.skin);
+      if (spec.skin === 3) matching += 1;
+    }
+    // The biased share, plus its fair share of the unbiased remainder.
+    const expected = SECTORS.skinBias + (1 - SECTORS.skinBias) / 5;
+    expect(matching / trials).toBeGreaterThan(expected - 0.04);
+    expect(matching / trials).toBeLessThan(expected + 0.04);
+    expect(seen.size).toBe(5);
+  });
+
+  it('never produces a comet', () => {
+    const rng = createRng(1);
+    for (let i = 0; i < 500; i += 1) {
+      const spec = makeAsteroidSpec(difficultyAt(200), rng, WORLD.width, 2);
+      expect(spec.comet).toBe(false);
+      expect(spec.warn).toBe(0);
+    }
+  });
+});
+
+describe('makeCometSpec', () => {
+  it('waits above the field, then falls straight down its lane', () => {
+    const rng = createRng(31337);
+    for (let i = 0; i < 400; i += 1) {
+      const spec = makeCometSpec(rng, WORLD.width);
+      expect(spec.comet).toBe(true);
+      expect(spec.warn).toBe(COMETS.warnSeconds);
+      expect(spec.y + spec.r).toBeLessThan(0);
+      // Straight down, or the lit lane would be a lie.
+      expect(spec.vx).toBe(0);
+      expect(spec.vy).toBe(COMETS.speed);
+      expect(spec.x - spec.r).toBeGreaterThanOrEqual(0);
+      expect(spec.x + spec.r).toBeLessThanOrEqual(WORLD.width);
+      expect(spec.skin).toBe(COMETS.skin);
+    }
+  });
+});
+
+describe('makeHazardSpec', () => {
+  it('never sends a comet before the field has warmed up', () => {
+    const rng = createRng(9);
+    const early = difficultyAt(3);
+    expect(early.cometChance).toBe(0);
+    for (let i = 0; i < 2000; i += 1) {
+      expect(makeHazardSpec(early, rng, WORLD.width).comet).toBe(false);
+    }
+  });
+
+  it('sends comets at roughly the configured rate once it has', () => {
+    const rng = createRng(10);
+    const late = difficultyAt(400);
+    const trials = 8000;
+    let comets = 0;
+    for (let i = 0; i < trials; i += 1) {
+      if (makeHazardSpec(late, rng, WORLD.width).comet) comets += 1;
+    }
+    expect(comets / trials).toBeGreaterThan(late.cometChance * 0.8);
+    expect(comets / trials).toBeLessThan(late.cometChance * 1.2);
+  });
+});
+
+describe('makeShardString', () => {
+  it('fits every shard of the string inside the field', () => {
+    const rng = createRng(4242);
+    for (let i = 0; i < 2000; i += 1) {
+      const spec = makeShardString(rng, WORLD.width);
+      expect(spec.count).toBeGreaterThanOrEqual(SHARDS.countMin);
+      expect(spec.count).toBeLessThanOrEqual(SHARDS.countMax);
+      expect(Math.abs(spec.stepX)).toBeLessThanOrEqual(SHARDS.maxStepX);
+      const first = spec.x;
+      const last = spec.x + spec.stepX * (spec.count - 1);
+      for (const x of [first, last]) {
+        expect(x - SHARDS.radius).toBeGreaterThanOrEqual(0);
+        expect(x + SHARDS.radius).toBeLessThanOrEqual(WORLD.width);
+      }
+    }
+  });
+
+  it('makes both straight and diagonal strings', () => {
+    const rng = createRng(77);
+    let straight = 0;
+    let diagonal = 0;
+    for (let i = 0; i < 500; i += 1) {
+      if (makeShardString(rng, WORLD.width).stepX === 0) straight += 1;
+      else diagonal += 1;
+    }
+    expect(straight).toBeGreaterThan(0);
+    expect(diagonal).toBeGreaterThan(0);
   });
 });

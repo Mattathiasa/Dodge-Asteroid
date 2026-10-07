@@ -11,6 +11,9 @@ declare global {
         ship: { x: number; y: number };
         asteroids: number;
         seed: number;
+        sector: number;
+        shards: number;
+        nearMisses: number;
       };
     };
   }

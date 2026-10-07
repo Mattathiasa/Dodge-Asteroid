@@ -36,13 +36,13 @@ const CARDS = [
   {
     file: 's-gameover.png',
     line1: 'Beat your best.',
-    line2: 'Scores are kept on your device.',
+    line2: 'See exactly where the points came from.',
     accent: '#ff5fb4',
   },
   {
     file: 's-settings.png',
     line1: 'Play it your way.',
-    line2: 'Three difficulties, reduced motion, sound off.',
+    line2: 'Three difficulties, reduced motion, music and sound.',
     accent: '#4ff0ff',
   },
 ];
@@ -72,7 +72,7 @@ await shootField('s-settings.png');
 await page.getByRole('button', { name: 'Back' }).click();
 await page.waitForTimeout(400);
 
-await page.getByRole('button', { name: 'Play' }).click();
+await page.getByRole('button', { name: 'Play', exact: true }).click();
 await page.waitForFunction(() => window.__dodge.snapshot().phase === 'playing', null, {
   timeout: 20_000,
 });
@@ -111,7 +111,8 @@ while (Date.now() - started < 80_000) {
   await page.waitForTimeout(16);
   if ((await snap()).phase === 'gameOver') break;
 }
-await page.waitForTimeout(700);
+// Long enough for the final score to finish counting up.
+await page.waitForTimeout(1500);
 await shootField('s-gameover.png');
 await context.close();
 

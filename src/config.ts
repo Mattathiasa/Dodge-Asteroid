@@ -63,6 +63,10 @@ export const DIFFICULTY = {
   driftX: { start: 20, peak: 90 },
   maxActive: { start: 5, peak: 22 },
   powerUpChance: { start: 0.04, peak: 0.1 },
+  /** Share of spawns that are telegraphed comets rather than rocks. */
+  cometChance: { start: 0.05, peak: 0.16 },
+  /** Milliseconds between strings of star shards. */
+  shardIntervalMs: { start: 3600, peak: 2300 },
 
   /** Randomness applied to each spawn interval, as a fraction. */
   spawnJitter: 0.25,
@@ -82,6 +86,54 @@ export const SCORING = {
   /** Multiplier gained per combo step. */
   comboStep: 0.15,
   comboMax: 10,
+} as const;
+
+/**
+ * Comets are the one hazard that is telegraphed: a lane lights up, then a fast
+ * rock comes straight down it. Speed without warning is unfair; speed with a
+ * clear warning is a test of attention, which is the point.
+ */
+export const COMETS = {
+  /** Intensity below which no comets appear, so the opening stays readable. */
+  minIntensity: 0.12,
+  /** Seconds the lane is lit before the comet launches. */
+  warnSeconds: 0.95,
+  speed: 560,
+  radiusMin: 9,
+  radiusMax: 12,
+  /** Index into the renderer's colour families, reserved for comets. */
+  skin: 5,
+} as const;
+
+/**
+ * Star shards are the reason to move. Without them the best strategy is to
+ * hover low and wait, which is safe and dull; a string of shards drifting
+ * between two rocks is a decision.
+ */
+export const SHARDS = {
+  radius: 8,
+  fallSpeed: 150,
+  countMin: 3,
+  countMax: 5,
+  /** Vertical gap between shards in one string. */
+  spacing: 30,
+  /** Largest sideways step between shards, for diagonal strings. */
+  maxStepX: 24,
+  /** Shards inside this distance are pulled toward the ship. */
+  magnetRadius: 58,
+  magnetAccel: 2600,
+  points: 10,
+  /** Shards collected within this window of each other form a chain. */
+  chainWindowMs: 650,
+  capacity: 32,
+} as const;
+
+/** The field changes character every so often, and says so. */
+export const SECTORS = {
+  /** Seconds of (difficulty-scaled) time per sector. */
+  seconds: 25,
+  /** How often a rock takes the sector's colour family rather than a random one. */
+  skinBias: 0.65,
 } as const;
 
 export const POWERUPS = {
@@ -106,6 +158,21 @@ export const PARTICLES = {
   minLife: 0.3,
   maxLife: 0.95,
   drag: 0.86,
+} as const;
+
+/**
+ * Moments the game deliberately holds on, because an impact that resolves in a
+ * single frame does not register as an impact.
+ */
+export const FEEL = {
+  /** Seconds the simulation freezes when a life is lost. */
+  hitStopOnLifeLost: 0.11,
+  /** Seconds the simulation freezes on the fatal hit. */
+  hitStopOnDestroyed: 0.16,
+  /** Seconds the explosion plays before the run-over screen appears. */
+  deathSeconds: 1.15,
+  /** World time scale while the explosion plays out. */
+  deathTimeScale: 0.35,
 } as const;
 
 export const CAMERA = {
@@ -140,7 +207,7 @@ export const SPAWN = {
   powerUpCapacity: 8,
   /** Distinct asteroid silhouettes. */
   shapeCount: 6,
-  /** Distinct asteroid colour families. */
+  /** Distinct rock colour families. Comets have one more, of their own. */
   skinCount: 5,
 } as const;
 
@@ -161,6 +228,10 @@ export const PALETTE = {
   powerShield: '#7dffc4',
   powerSlowmo: '#ffd35c',
   powerLife: '#ff7bd5',
+  shard: '#ffe7a3',
+  shardCore: '#fffaf0',
+  comet: '#bff6ff',
+  danger: '#ff4f6d',
   text: '#e8ecff',
 } as const;
 

@@ -2,17 +2,33 @@ import type { Camera } from './camera.js';
 import type { Viewport } from '../core/viewport.js';
 import type { World } from '../game/world.js';
 import type { PowerUpKind } from '../game/entities.js';
-import { DIFFICULTY, PALETTE, SHIP, WORLD } from '../config.js';
+import { COMETS, DIFFICULTY, PALETTE, SHIP, WORLD } from '../config.js';
 import { TAU, clamp, clamp01, lerp } from '../core/math.js';
+import { Backdrop } from './backdrop.js';
+import { Effects } from './effects.js';
 import { Starfield } from './starfield.js';
+import { comboRemaining } from '../game/scoring.js';
 import { createRng } from '../core/rng.js';
 import { drawMeteor } from './meteors.js';
+
+/** What the frame is showing, beyond the world itself. */
+export interface Scene {
+  readonly showShip: boolean;
+  /** 0..1 position on the difficulty curve; paces the starfield and heat. */
+  readonly intensity: number;
+  /** Which sector's colours the backdrop should be in. */
+  readonly sector: number;
+}
+
+const INK = '#1b0b36';
 
 export class Renderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly starfield: Starfield;
+  private readonly backdrop = new Backdrop();
+  readonly fx = new Effects();
   private time = 0;
-  effectsEnabled = true;
+  private effects = true;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -22,6 +38,16 @@ export class Renderer {
     if (context === null) throw new Error('2D canvas context is unavailable');
     this.ctx = context;
     this.starfield = new Starfield(createRng(seed));
+  }
+
+  get effectsEnabled(): boolean {
+    return this.effects;
+  }
+
+  /** Glow, flicker, drift, shockwaves and flashes; off when motion is reduced. */
+  set effectsEnabled(enabled: boolean) {
+    this.effects = enabled;
+    this.fx.motion = enabled;
   }
 
   /**
@@ -35,12 +61,26 @@ export class Renderer {
     if (this.canvas.height !== viewport.pixelHeight) this.canvas.height = viewport.pixelHeight;
   }
 
-  updateBackground(dt: number): void {
+  /**
+   * Advances everything that animates but is not simulated: the backdrop, the
+   * starfield and the effects layer. Skipped during a hit-stop, so the whole
+   * frame holds still together.
+   */
+  update(dt: number, scene: Scene, slowmo: boolean): void {
+    this.fx.update(dt);
+    this.backdrop.update(dt, scene.sector, scene.intensity, this.effects);
+    if (!this.effects) return;
     this.time += dt;
-    this.starfield.update(dt);
+    this.starfield.update(dt, (1 + scene.intensity * 1.8) * (slowmo ? 0.45 : 1));
   }
 
-  draw(world: World, alpha: number, viewport: Viewport, camera: Camera, showShip = true): void {
+  /** Starts a fresh run on the opening sector's colours, with no leftover effects. */
+  resetScene(): void {
+    this.backdrop.jumpTo(0);
+    this.fx.clear();
+  }
+
+  draw(world: World, alpha: number, viewport: Viewport, camera: Camera, scene: Scene): void {
     const { ctx } = this;
 
     ctx.setTransform(viewport.dpr, 0, 0, viewport.dpr, 0, 0);
@@ -50,33 +90,169 @@ export class Renderer {
     ctx.save();
     ctx.translate(camera.shakeX, camera.shakeY);
 
-    this.drawBackdrop(ctx);
-    this.starfield.draw(ctx);
+    this.backdrop.draw(ctx);
+    this.starfield.draw(ctx, this.effects);
+    this.drawCometLanes(ctx, world);
+    this.drawShards(ctx, world, alpha);
     this.drawPowerUps(ctx, world, alpha);
     this.drawAsteroids(ctx, world, alpha);
-    if (showShip) this.drawShip(ctx, world, alpha);
+    if (scene.showShip) this.drawShip(ctx, world, alpha);
     this.drawParticles(ctx, world, alpha);
+    this.fx.drawWorld(ctx);
 
     ctx.restore();
+
+    if (scene.showShip && world.ship.slowmoTime > 0) this.drawSlowmoTint(ctx, world);
+    this.fx.drawScreen(ctx, WORLD.width, WORLD.height);
   }
 
-  private drawBackdrop(ctx: CanvasRenderingContext2D): void {
-    const gradient = ctx.createRadialGradient(
-      WORLD.width / 2,
-      WORLD.height * 0.35,
-      0,
-      WORLD.width / 2,
-      WORLD.height * 0.35,
-      WORLD.height * 0.9,
-    );
-    gradient.addColorStop(0, PALETTE.backgroundGlow);
-    gradient.addColorStop(1, PALETTE.background);
-    ctx.fillStyle = gradient;
+  /**
+   * The lane a comet is about to fall down.
+   *
+   * It brightens and pulses faster as launch approaches, and the warning badge
+   * sits below the HUD so a score chip can never hide it.
+   */
+  private drawCometLanes(ctx: CanvasRenderingContext2D, world: World): void {
+    world.asteroids.forEach((a) => {
+      if (!a.comet || a.warn <= 0) return;
+      const progress = clamp01(1 - a.warn / COMETS.warnSeconds);
+      const pulse = this.effects ? 0.5 + 0.5 * Math.sin(this.time * (10 + progress * 26)) : 0.5;
+      const half = a.r * 1.6;
+
+      ctx.save();
+      ctx.fillStyle = PALETTE.danger;
+      ctx.globalAlpha = 0.05 + progress * 0.13 + pulse * 0.06;
+      ctx.fillRect(a.x - half, 0, half * 2, WORLD.height);
+
+      ctx.globalAlpha = 0.35 + progress * 0.45;
+      ctx.strokeStyle = PALETTE.danger;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([10, 9]);
+      ctx.lineDashOffset = -this.time * 90;
+      ctx.beginPath();
+      ctx.moveTo(a.x - half, 0);
+      ctx.lineTo(a.x - half, WORLD.height);
+      ctx.moveTo(a.x + half, 0);
+      ctx.lineTo(a.x + half, WORLD.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // A sticker-style warning badge.
+      const size = 15 * (1 + pulse * 0.12);
+      ctx.globalAlpha = 1;
+      ctx.translate(a.x, 80);
+      ctx.beginPath();
+      ctx.moveTo(0, -size);
+      ctx.lineTo(size * 1.05, size * 0.75);
+      ctx.lineTo(-size * 1.05, size * 0.75);
+      ctx.closePath();
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+      ctx.fillStyle = PALETTE.danger;
+      ctx.fill();
+      ctx.fillStyle = '#fff3dc';
+      ctx.font = `${String(Math.round(size * 0.95))}px 'Bungee', 'Outfit', sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('!', 0, size * 0.18);
+      ctx.restore();
+    });
+  }
+
+  /** Spinning gems: a different shape from every hazard and every pickup. */
+  private drawShards(ctx: CanvasRenderingContext2D, world: World, alpha: number): void {
+    world.shards.forEach((s) => {
+      const x = lerp(s.px, s.x, alpha);
+      const y = lerp(s.py, s.y, alpha);
+      // Drawn a touch larger than the pickup radius, so a reward reads as one.
+      const r = s.r * 1.15;
+      // Squashing the width reads as a gem turning on its vertical axis.
+      const turn = this.effects ? 0.55 + Math.abs(Math.cos(s.age * 2.6)) * 0.45 : 1;
+
+      ctx.save();
+      ctx.translate(x, y);
+
+      if (this.effects) {
+        ctx.shadowColor = PALETTE.shard;
+        ctx.shadowBlur = r * 1.8;
+      }
+
+      ctx.scale(turn, 1);
+      const gem = ctx.createLinearGradient(-r, -r * 1.4, r, r * 1.4);
+      gem.addColorStop(0, PALETTE.shardCore);
+      gem.addColorStop(0.45, PALETTE.shard);
+      gem.addColorStop(1, '#e09a2c');
+
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 1.4);
+      ctx.lineTo(r * 0.9, 0);
+      ctx.lineTo(0, r * 1.4);
+      ctx.lineTo(-r * 0.9, 0);
+      ctx.closePath();
+      ctx.fillStyle = gem;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+
+      // One facet in shadow gives it a cut edge.
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = '#7a3a00';
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 1.4);
+      ctx.lineTo(r * 0.9, 0);
+      ctx.lineTo(0, r * 1.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // A glint that comes and goes.
+      const glint = this.effects ? Math.max(0, Math.sin(s.age * 3.1)) : 0.6;
+      if (glint > 0.05) {
+        ctx.save();
+        ctx.globalAlpha = glint;
+        ctx.fillStyle = '#ffffff';
+        ctx.translate(x - r * 0.25, y - r * 0.55);
+        const g = r * 0.55 * glint;
+        ctx.beginPath();
+        ctx.moveTo(0, -g);
+        ctx.lineTo(g * 0.22, 0);
+        ctx.lineTo(0, g);
+        ctx.lineTo(-g * 0.22, 0);
+        ctx.closePath();
+        ctx.moveTo(-g, 0);
+        ctx.lineTo(0, g * 0.22);
+        ctx.lineTo(g, 0);
+        ctx.lineTo(0, -g * 0.22);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    });
+  }
+
+  /** A warm wash at the edges of the field while time is dilated. */
+  private drawSlowmoTint(ctx: CanvasRenderingContext2D, world: World): void {
+    const strength = clamp01(world.ship.slowmoTime / 0.6) * 0.26;
+    const cx = WORLD.width / 2;
+    const cy = WORLD.height / 2;
+    const tint = ctx.createRadialGradient(cx, cy, WORLD.height * 0.28, cx, cy, WORLD.height * 0.72);
+    tint.addColorStop(0, 'rgba(255, 211, 92, 0)');
+    tint.addColorStop(1, `rgba(255, 211, 92, ${strength.toFixed(3)})`);
+    ctx.save();
+    ctx.fillStyle = tint;
     ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+    ctx.restore();
   }
 
   private drawAsteroids(ctx: CanvasRenderingContext2D, world: World, alpha: number): void {
     world.asteroids.forEach((a) => {
+      // A comet still waiting above the field is shown by its lane alone.
+      if (a.warn > 0) return;
       drawMeteor(ctx, {
         x: lerp(a.px, a.x, alpha),
         y: lerp(a.py, a.y, alpha),
@@ -89,7 +265,8 @@ export class Renderer {
         shape: a.shape,
         skin: a.skin,
         time: this.time,
-        effects: this.effectsEnabled,
+        effects: this.effects,
+        tailScale: a.comet ? 1.7 : 1,
       });
     });
   }
@@ -107,7 +284,7 @@ export class Renderer {
       ctx.scale(pulse, pulse);
 
       // Glossy capsule, so pickups read as rewards rather than hazards.
-      if (this.effectsEnabled) {
+      if (this.effects) {
         ctx.shadowColor = color;
         ctx.shadowBlur = p.r * 1.6;
       }
@@ -148,13 +325,21 @@ export class Renderer {
     const x = lerp(ship.px, ship.x, alpha);
     const y = lerp(ship.py, ship.y, alpha);
 
-    if (this.effectsEnabled) this.drawTrail(ctx, world);
+    if (this.effects) this.drawTrail(ctx, world);
 
     // Blink through post-hit invulnerability so the state is readable.
     const blinking = ship.invulnTime > 0 && Math.floor(ship.invulnTime * 12) % 2 === 0;
 
     ctx.save();
     ctx.translate(x, y);
+
+    this.drawComboRing(ctx, world);
+
+    if (ship.shieldTime > 0) {
+      const fading = ship.shieldTime < 1.5 && Math.floor(ship.shieldTime * 8) % 2 === 0;
+      if (!fading) this.drawShieldBubble(ctx, ship.r, ship.shieldTime / SHIP.shieldSeconds);
+    }
+
     // Bank into the direction of travel; it makes the craft feel like it has
     // mass rather than sliding around flat.
     ctx.rotate(clamp(ship.vx / SHIP.maxSpeed, -1, 1) * 0.42);
@@ -164,11 +349,38 @@ export class Renderer {
       this.drawHull(ctx, ship.r);
     }
 
-    if (ship.shieldTime > 0) {
-      const fading = ship.shieldTime < 1.5 && Math.floor(ship.shieldTime * 8) % 2 === 0;
-      if (!fading) this.drawShieldBubble(ctx, ship.r);
-    }
+    ctx.restore();
+  }
 
+  /**
+   * The combo timer, drawn round the ship.
+   *
+   * The combo lapses if the next near miss does not come in time. Putting that
+   * clock where the player is already looking makes it something they can play
+   * against, rather than a number in a corner they never read.
+   */
+  private drawComboRing(ctx: CanvasRenderingContext2D, world: World): void {
+    const remaining = comboRemaining(world.score, world.clockMs);
+    if (remaining <= 0) return;
+    const radius = world.ship.r + 15;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = PALETTE.powerSlowmo;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, TAU);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.95;
+    if (this.effects) {
+      ctx.shadowColor = PALETTE.powerSlowmo;
+      ctx.shadowBlur = 8;
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + remaining * TAU);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -181,7 +393,7 @@ export class Renderer {
     flame.addColorStop(0.35, PALETTE.shipGlow);
     flame.addColorStop(1, 'transparent');
 
-    if (this.effectsEnabled) {
+    if (this.effects) {
       ctx.shadowColor = PALETTE.shipGlow;
       ctx.shadowBlur = r * 1.4;
     }
@@ -196,7 +408,7 @@ export class Renderer {
   }
 
   private drawHull(ctx: CanvasRenderingContext2D, r: number): void {
-    if (this.effectsEnabled) {
+    if (this.effects) {
       ctx.shadowColor = PALETTE.shipGlow;
       ctx.shadowBlur = r * 1.6;
     }
@@ -237,7 +449,8 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  private drawShieldBubble(ctx: CanvasRenderingContext2D, r: number): void {
+  /** The bubble, with its rim drawn as a countdown of the time it has left. */
+  private drawShieldBubble(ctx: CanvasRenderingContext2D, r: number, remaining: number): void {
     const radius = r + 9;
     const bubble = ctx.createRadialGradient(0, 0, radius * 0.6, 0, 0, radius);
     bubble.addColorStop(0, 'transparent');
@@ -249,15 +462,22 @@ export class Renderer {
     ctx.arc(0, 0, radius, 0, TAU);
     ctx.fill();
 
-    if (this.effectsEnabled) {
-      ctx.shadowColor = PALETTE.shield;
-      ctx.shadowBlur = 14;
-    }
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = 0.3;
     ctx.strokeStyle = PALETTE.shield;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, TAU);
+    ctx.stroke();
+
+    if (this.effects) {
+      ctx.shadowColor = PALETTE.shield;
+      ctx.shadowBlur = 14;
+    }
+    ctx.globalAlpha = 0.95;
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + clamp01(remaining) * TAU);
     ctx.stroke();
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
@@ -283,14 +503,25 @@ export class Renderer {
     ctx.restore();
   }
 
+  /**
+   * Particles are drawn as sparks: short streaks along their velocity, added
+   * onto what is behind them so overlapping sparks bloom instead of stacking.
+   * Drag shortens each streak as the spark slows, for free.
+   */
   private drawParticles(ctx: CanvasRenderingContext2D, world: World, alpha: number): void {
     ctx.save();
+    if (this.effects) ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
     world.particles.forEach((p) => {
       const x = lerp(p.px, p.x, alpha);
       const y = lerp(p.py, p.y, alpha);
       ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-      ctx.fillStyle = p.color;
-      ctx.fillRect(x - p.size / 2, y - p.size / 2, p.size, p.size);
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = p.size;
+      ctx.beginPath();
+      ctx.moveTo(x - p.vx * 0.035, y - p.vy * 0.035);
+      ctx.lineTo(x, y);
+      ctx.stroke();
     });
     ctx.restore();
   }

@@ -9,6 +9,9 @@ interface DebugSnapshot {
   ship: { x: number; y: number };
   asteroids: number;
   seed: number;
+  sector: number;
+  shards: number;
+  nearMisses: number;
 }
 
 async function snapshot(page: Page): Promise<DebugSnapshot> {
@@ -46,7 +49,7 @@ async function crashTheShip(page: Page): Promise<void> {
 
 /** Waits until the game leaves the countdown and is actually simulating. */
 async function startRun(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect.poll(async () => (await snapshot(page)).phase, { timeout: 15_000 }).toBe('playing');
 }
 
@@ -57,7 +60,7 @@ test.beforeEach(async ({ page }) => {
 
 test('boots to the menu with a sized canvas', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Dodge Asteroid', level: 2 })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
 
   const size = await page.locator('#game').evaluate((el: HTMLCanvasElement) => ({
     width: el.width,
@@ -140,6 +143,45 @@ test('ends the run with an in-page screen, never a native alert', async ({ page 
   expect(nativeDialog).toBe(false);
 });
 
+test('lets the explosion play out before the run-over screen', async ({ page }) => {
+  await startRun(page);
+  const box = await page.locator('#game').boundingBox();
+  expect(box).not.toBeNull();
+  if (box === null) return;
+
+  // Sweep until the ship is hit, watching for the beat between the two.
+  const phases = new Set<string>();
+  const started = Date.now();
+  while (Date.now() - started < 80_000) {
+    const t = (Date.now() - started) / 1000;
+    await page.mouse.move(
+      box.x + box.width * (0.5 + Math.sin(t * 2.2) * 0.42),
+      box.y + box.height * 0.42,
+    );
+    await page.waitForTimeout(16);
+    const { phase } = await snapshot(page);
+    phases.add(phase);
+    if (phase === 'gameOver') break;
+  }
+
+  expect(phases.has('dying')).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Run over' })).toBeVisible();
+});
+
+test('the run-over screen explains the score', async ({ page }) => {
+  await startRun(page);
+  await crashTheShip(page);
+
+  const stats = page.locator('#run-stats');
+  await expect(stats).toContainText('Near misses');
+  await expect(stats).toContainText('Best combo');
+  await expect(stats).toContainText('Shards');
+  await expect(stats).toContainText('Sector 1');
+
+  // The run just finished is marked on the board.
+  await expect(page.locator('#gameover-leaderboard [aria-current="true"]')).toHaveCount(1);
+});
+
 test('persists the best score across a reload', async ({ page }) => {
   await startRun(page);
   await page.waitForTimeout(2500);
@@ -172,7 +214,30 @@ test('the about screen replaces the original broken link', async ({ page }) => {
     'https://github.com/Mattathiasa',
   );
   await page.getByRole('button', { name: 'Back' }).click();
-  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+});
+
+test('the how-to-play screen opens at the top and comes back', async ({ page }) => {
+  await page.getByRole('button', { name: 'How to play' }).click();
+  const heading = page.getByRole('heading', { name: 'How to play' });
+  await expect(heading).toBeInViewport();
+  await expect(page.getByText('A red lane means a comet.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back' })).toBeFocused();
+
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+});
+
+test('settings persist the music preference separately from sound', async ({ page }) => {
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByLabel('Music').uncheck();
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.__dodge !== undefined)).toBe(true);
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await expect(page.getByLabel('Music')).not.toBeChecked();
+  await expect(page.getByLabel('Sound effects')).toBeChecked();
 });
 
 test('settings persist the sound preference', async ({ page }) => {

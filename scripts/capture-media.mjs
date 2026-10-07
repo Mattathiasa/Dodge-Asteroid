@@ -59,7 +59,7 @@ await page.evaluate(async (source) => {
   window.__gifenc = await import(url);
 }, gifencSource);
 
-await page.getByRole('button', { name: 'Play' }).click();
+await page.getByRole('button', { name: 'Play', exact: true }).click();
 await page.waitForFunction(() => window.__dodge.snapshot().phase === 'playing', null, {
   timeout: 20_000,
 });

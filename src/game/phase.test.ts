@@ -12,7 +12,8 @@ describe('reduce', () => {
     ['countdown', { type: 'TOGGLE_PAUSE' }, 'paused'],
     ['playing', { type: 'PAUSE' }, 'paused'],
     ['paused', { type: 'RESUME' }, 'playing'],
-    ['playing', { type: 'DIE' }, 'gameOver'],
+    ['playing', { type: 'DIE' }, 'dying'],
+    ['dying', { type: 'DEATH_ELAPSED' }, 'gameOver'],
     ['gameOver', { type: 'RESTART' }, 'countdown'],
     ['paused', { type: 'RESTART' }, 'countdown'],
     ['gameOver', { type: 'TO_MENU' }, 'menu'],
@@ -36,6 +37,14 @@ describe('reduce', () => {
     ['playing', { type: 'COUNTDOWN_ELAPSED' }],
     ['paused', { type: 'DIE' }],
     ['countdown', { type: 'DIE' }],
+    ['playing', { type: 'DEATH_ELAPSED' }],
+    // Once the ship is gone there is nothing to pause, restart or abandon:
+    // the explosion plays out and the run-over screen follows.
+    ['dying', { type: 'PAUSE' }],
+    ['dying', { type: 'TOGGLE_PAUSE' }],
+    ['dying', { type: 'RESTART' }],
+    ['dying', { type: 'TO_MENU' }],
+    ['dying', { type: 'DIE' }],
   ];
 
   it.each(noOps)('%s is unchanged by %o', (from, event) => {
@@ -44,9 +53,10 @@ describe('reduce', () => {
 });
 
 describe('phase predicates', () => {
-  it('simulates only while counting down or playing', () => {
+  it('simulates only while counting down, playing or dying', () => {
     expect(isSimulating('playing')).toBe(true);
     expect(isSimulating('countdown')).toBe(true);
+    expect(isSimulating('dying')).toBe(true);
     expect(isSimulating('menu')).toBe(false);
     expect(isSimulating('paused')).toBe(false);
     expect(isSimulating('gameOver')).toBe(false);
@@ -56,5 +66,6 @@ describe('phase predicates', () => {
     expect(acceptsSteering('playing')).toBe(true);
     expect(acceptsSteering('countdown')).toBe(true);
     expect(acceptsSteering('paused')).toBe(false);
+    expect(acceptsSteering('dying')).toBe(false);
   });
 });

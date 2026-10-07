@@ -37,8 +37,20 @@ export interface Asteroid extends Body {
   skin: number;
   /** Whether this asteroid has already been scored as dodged. */
   scored: boolean;
+  /** Whether it is inside the near-miss margin of the ship right now. */
+  grazing: boolean;
   /** Whether a near-miss bonus has already been awarded for it. */
   nearMissed: boolean;
+  /** Whether this is a telegraphed comet rather than an ordinary rock. */
+  comet: boolean;
+  /** Seconds left on a comet's lane warning; it holds still until this is 0. */
+  warn: number;
+}
+
+/** A collectible. Shards are worth points and pulled in when the ship is close. */
+export interface Shard extends Body {
+  /** Seconds this shard has existed, for its spin and sparkle. */
+  age: number;
 }
 
 export type PowerUpKind = 'shield' | 'slowmo' | 'life';
@@ -89,8 +101,15 @@ export function createAsteroid(): Asteroid {
     shape: 0,
     skin: 0,
     scored: false,
+    grazing: false,
     nearMissed: false,
+    comet: false,
+    warn: 0,
   };
+}
+
+export function createShard(): Shard {
+  return { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, r: 1, alive: false, age: 0 };
 }
 
 export function createPowerUp(): PowerUp {

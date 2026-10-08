@@ -29,6 +29,11 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   {
+    // The service worker template runs in a worker, not a page.
+    files: ['pwa/**/*.js'],
+    languageOptions: { globals: { ...globals.serviceworker } },
+  },
+  {
     // Command-line utilities; printing to stdout is the point.
     files: ['scripts/**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],

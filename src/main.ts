@@ -48,6 +48,7 @@ import { SKINS, newlyUnlocked } from './game/unlocks.js';
 import { allDone, missionsFor } from './game/missions.js';
 import { renderHangar } from './ui/hangar.js';
 import { renderMissions } from './ui/missions.js';
+import { isInstalled, registerServiceWorker, setupInstallButton } from './pwa/pwa.js';
 import { renderLeaderboard } from './ui/leaderboard.js';
 import { renderRunStats } from './ui/summary.js';
 import { updateAttract } from './game/attract.js';
@@ -875,6 +876,9 @@ function start(): void {
   reducedMotionToggle.checked = reducedMotion;
   difficultySelect.value = difficulty;
   must<HTMLElement>('analytics-note').hidden = !analytics.enabled;
+  setupInstallButton(must('install-button'), (event) => analytics.track(event));
+  if (isInstalled()) analytics.track('pwa/launch');
+  registerServiceWorker();
   applyMotionPreference();
   applyMute();
   applyMusic();

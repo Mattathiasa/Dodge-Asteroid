@@ -29,17 +29,13 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://mattathiasa.github.io/Dodge-Asteroid/og.jpg" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2304141c'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%237dffd8'/%3E%3Ccircle cx='10' cy='8' r='3.4' fill='%23ff6b4a'/%3E%3Ccircle cx='23' cy='11' r='2.6' fill='%23ff6b4a'/%3E%3C/svg%3E"
-    />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Dodge" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   </head>
 
   <body>
@@ -102,6 +98,9 @@
                 <button class="pill" id="guide-button" type="button">How to play</button>
                 <button class="pill" id="settings-button" type="button">Settings</button>
                 <button class="pill" id="about-button" type="button">About</button>
+                <button class="pill pill--install" id="install-button" type="button" hidden>
+                  Install app
+                </button>
               </div>
 
               <dl class="stats" id="menu-stats"></dl>
@@ -359,6 +358,11 @@
                   <strong>Controls</strong> — move with the mouse, touch, arrow keys or
                   <kbd>WASD</kbd>. <kbd>P</kbd> or <kbd>Esc</kbd> pauses, <kbd>R</kbd> restarts,
                   <kbd>M</kbd> mutes.
+                </p>
+                <p>
+                  <strong>Install it</strong> — on a phone, open your browser's menu and choose
+                  <em>Add to Home Screen</em> (on an iPhone: Share, then Add to Home Screen). It
+                  opens full screen and plays offline, daily run included.
                 </p>
                 <p id="analytics-note" hidden>
                   Anonymous visit and run counts are kept with GoatCounter, which sets no cookies

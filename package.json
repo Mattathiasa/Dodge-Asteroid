@@ -25,6 +25,7 @@
     "e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run test",
     "media": "node scripts/capture-media.mjs docs && node scripts/capture-store.mjs docs/store",
+    "icons": "node scripts/make-icons.mjs",
     "decks": "node scripts/deck-case-study.cjs && node scripts/deck-design-directions.cjs"
   },
   "devDependencies": {

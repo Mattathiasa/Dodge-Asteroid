@@ -11,6 +11,26 @@
    the DOM and the play field stay in step.
    ========================================================================== */
 
+/* Fonts are served with the game rather than from Google Fonts, so the
+   installed app looks the same offline as online and no third party sees a
+   request. Latin subsets only; licences sit beside the files (SIL OFL 1.1).
+   Outfit is a variable font, so one file covers every weight used here. */
+@font-face {
+  font-family: 'Bungee';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/bungee-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/outfit-latin.woff2') format('woff2');
+}
+
 :root {
   --ink: #0b1f26;
   --ink-soft: #46666d;
@@ -782,6 +802,16 @@ body[data-screen='menu'] .stage.has-overlay .overlays {
   box-shadow: 0 5px 0 var(--ink);
   cursor: pointer;
   transition: transform 90ms ease;
+}
+
+/* Only shown when the browser offers to install, so it may as well stand out. */
+.pill--install {
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--cyan-light) 0%, var(--cyan) 100%);
+}
+
+.pill--install[hidden] {
+  display: none;
 }
 
 .pill:hover,

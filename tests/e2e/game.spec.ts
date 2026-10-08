@@ -370,6 +370,61 @@ test.describe('ghost, missions and ship finishes', () => {
   });
 });
 
+test.describe('installable app', () => {
+  test('declares a manifest, and serves every icon in it', async ({ page }) => {
+    const href = await page.locator('link[rel="manifest"]').getAttribute('href');
+    expect(href).not.toBeNull();
+    const manifestUrl = new URL(href ?? '', page.url());
+    const response = await page.request.get(manifestUrl.toString());
+    expect(response.ok()).toBe(true);
+
+    const manifest = (await response.json()) as {
+      display: string;
+      icons: { src: string; purpose: string }[];
+    };
+    expect(manifest.display).toBe('standalone');
+    expect(manifest.icons.some((icon) => icon.purpose === 'maskable')).toBe(true);
+    for (const icon of manifest.icons) {
+      const image = await page.request.get(new URL(icon.src, manifestUrl).toString());
+      expect(image.ok()).toBe(true);
+    }
+  });
+
+  test('boots and plays with no network after the first visit', async ({ page, context }) => {
+    // The service worker takes over the page once it has cached the game.
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    await expect
+      .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
+      .toBe(true);
+
+    // Opening another file directly is a navigation too, and must not
+    // replace the game as the page that comes back offline.
+    await page.goto('./og.jpg');
+
+    await context.setOffline(true);
+    try {
+      await page.goto('./');
+      await expect.poll(() => page.evaluate(() => window.__dodge !== undefined)).toBe(true);
+      // The fonts ship with the game, so the title is not left in a fallback.
+      const loaded = await page.evaluate(async () => {
+        await document.fonts.ready;
+        return [...document.fonts]
+          .filter((face) => face.status === 'loaded')
+          .map((face) => face.family.replace(/["']/g, ''));
+      });
+      expect(loaded).toEqual(expect.arrayContaining(['Bungee', 'Outfit']));
+      await startRun(page);
+      await expect
+        .poll(async () => (await snapshot(page)).score, { timeout: 10_000 })
+        .toBeGreaterThan(0);
+    } finally {
+      await context.setOffline(false);
+    }
+  });
+});
+
 test.describe('touch', () => {
   test.skip(({ hasTouch }) => !hasTouch, 'touch-only behaviour');
 

@@ -17,6 +17,8 @@ export interface ScoreState {
   bestCombo: number;
   /** Star shards collected this run. */
   shards: number;
+  /** Pickups collected this run. */
+  pickups: number;
 }
 
 export function createScoreState(): ScoreState {
@@ -30,6 +32,7 @@ export function createScoreState(): ScoreState {
     nearMisses: 0,
     bestCombo: 0,
     shards: 0,
+    pickups: 0,
   };
 }
 

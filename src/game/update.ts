@@ -343,6 +343,7 @@ function advancePowerUps(world: World, dt: number, events: SimEventSink): void {
     if (!ship.alive || !circlesOverlap(ship, p)) return;
 
     p.alive = false;
+    world.score.pickups += 1;
     switch (p.kind) {
       case 'shield':
         ship.shieldTime = SHIP.shieldSeconds;

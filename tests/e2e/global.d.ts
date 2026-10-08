@@ -6,6 +6,7 @@ declare global {
       snapshot(): {
         phase: string;
         mode: string;
+        ghost: boolean;
         score: number;
         elapsed: number;
         lives: number;
@@ -16,6 +17,7 @@ declare global {
         shards: number;
         nearMisses: number;
       };
+      verifyBest(): { stored: number; replayed: number } | null;
     };
   }
 }

@@ -64,6 +64,10 @@ Canvas 2D · zero runtime dependencies
   that vaporises what it touches, time dilation, and an extra life.
 - **Plays anywhere.** Mouse, touch, arrow keys or WASD. Touch steers a point
   above your finger, because a fingertip covers the ship otherwise.
+- **Installs like an app, and plays offline.** Add it to a home screen and it
+  opens full screen from its own icon, daily run and missions included, with no
+  network at all after the first visit. The fonts ship with the game, so it
+  looks the same offline and no third party is asked for anything.
 - **Difficulty that plateaus** instead of running away.
 - **Local leaderboard**, personal bests, and difficulty presets, saved between
   sessions.
@@ -101,6 +105,8 @@ src/
   audio/    sound effects and music synthesised at runtime
   ui/       HUD, overlays, run summary, leaderboard, announcements
   storage/  persistence that never throws
+  pwa/      service worker registration and the install button
+pwa/        the service worker template the build fills in
 ```
 
 `core/` and `game/` never import from `render/`, `input/`, `audio/` or the DOM.
@@ -156,6 +162,16 @@ intensity)` decides the arrangement and is unit-tested; a small scheduler
   callback, so a dropped frame never makes the beat stutter.
 - **The difficulty curve** is a `smoothstep` ramp with a hard speed cap: flat at
   the start, steepest in the middle, flat once it tops out.
+- **The service worker is written by hand and finished by the build.** A small
+  Vite plugin fills in the exact list of built files and a hash of their
+  contents, so a deploy that changes nothing does not invalidate anyone's
+  cache, and one that does replaces it whole. The page is fetched network-first
+  so a new version arrives on the next visit; the content-hashed bundle is
+  served from the cache. Vite marks the bundle `crossorigin`, so those requests
+  carry an `Origin` header the precache did not, and a host answering with
+  `Vary: Origin` would make every lookup miss; the worker ignores `Vary` for
+  files that can never change. An end-to-end test takes the network away and
+  plays a run.
 - **Entities live in fixed-capacity pools**, so a long run does no per-frame
   allocation and never pauses for garbage collection mid-dodge.
 - **The canvas backing store carries the world's own aspect ratio**, sized in
@@ -168,7 +184,7 @@ intensity)` decides the arrangement and is unit-tested; a small scheduler
 ## Testing
 
 The simulation is a pure function of its seed, its input and its timestep, and
-that is what the tests cover: **253 unit tests** across the difficulty curve,
+that is what the tests cover: **259 unit tests** across the difficulty curve,
 collision (including the tunnelling case), scoring and near-miss timing, comets
 and their warnings, shards and their pull, sectors, spawning, the state machine,
 the loop, the object pool, persistence, the music arrangement, and a
@@ -182,8 +198,9 @@ the mouse and the keyboard, that pausing genuinely freezes the world, that a
 crash plays out before a run ends on an in-page screen that explains the score,
 that the best score and the sound and music settings survive a reload, that a
 daily run is the same seed on every attempt and its result can be shared, that
-the run the game recorded replays to the score it actually got, and that a tap
-steers on a touch screen.
+the run the game recorded replays to the score it actually got, that the game
+boots and plays a run with the network switched off, and that a tap steers on a
+touch screen.
 
 ```bash
 npm run typecheck   # tsc --noEmit
@@ -204,9 +221,13 @@ npm run build     # -> dist/
 npm run preview   # serve the production build
 ```
 
-`npm run build` produces about **57 KB of JavaScript, 20 KB gzipped**, with no
-runtime dependencies and no binary assets — the ship, the asteroids, the
-particles, every sound effect and the music are generated at runtime.
+`npm run build` produces about **73 KB of JavaScript, 26 KB gzipped**, with no
+runtime dependencies. The only binary assets are two fonts and the app icons —
+the ship, the asteroids, the particles, every sound effect and the music are
+generated at runtime.
+
+The icons are drawn from one SVG of the ship; `npm run icons` regenerates them
+into `public/icons/`.
 
 To regenerate the media in this README:
 
@@ -215,6 +236,17 @@ npm run build && npm run preview -- --port 4173 --strictPort &
 npm run media    # screenshots, the demo GIF, the store cards and public/og.jpg
 npm run decks    # the two slide decks in docs/decks/
 ```
+
+## Install it
+
+- **Android, or Chrome and Edge on a computer:** press **Install app** on the
+  title screen when it appears, or choose _Install_ / _Add to Home Screen_ in
+  the browser menu.
+- **iPhone and iPad:** in Safari, Share, then _Add to Home Screen_.
+
+It opens full screen from its own icon and plays offline. Scores, streaks and
+finishes stay on the device, as they do in the browser. A new version arrives
+the next time it is opened with a connection.
 
 ## Usage counts
 
@@ -227,7 +259,8 @@ Off by default. To see how many people play, and how far they get:
    `mygame.goatcounter.com`.
 
 The next deploy counts page views plus `run/start/daily`,
-`run/end/endless/sector-3`, `share/daily` and similar events. With the variable
+`run/end/endless/sector-3`, `share/daily`, `pwa/installed`, `pwa/launch` and
+similar events. With the variable
 unset, no script is loaded at all.
 
 ## Decks
@@ -256,10 +289,11 @@ to avoid:
 | The ship rendered a full body-width away from the cursor                                                                                                                       | One tested coordinate mapping                                       |
 | Mouse only, with no viewport meta tag, so it could not be played on a phone                                                                                                    | Mouse, touch and keyboard                                           |
 | 86 KB of vendored jQuery carrying three CVEs                                                                                                                                   | No runtime dependencies                                             |
-| No tests, no CI, no licence                                                                                                                                                    | 253 unit tests, 23 e2e specs, CI on every push                      |
+| No tests, no CI, no licence                                                                                                                                                    | 259 unit tests, 25 e2e specs, CI on every push                      |
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The fonts, Bungee and Outfit, are under the SIL
+Open Font License 1.1; their licences are in [`src/fonts/`](src/fonts).
 
 Built by [Mattathias Abraham](https://github.com/Mattathiasa).
